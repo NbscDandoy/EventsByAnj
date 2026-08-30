@@ -158,7 +158,25 @@ body {
 .sidebar-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
+}
+
+/* BRAND LOGO STYLING */
+.sidebar-brand-logo {
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: transform var(--transition-fast);
+}
+
+.sidebar-brand-logo:hover {
+  transform: scale(1.02);
 }
 
 .sidebar-header .brand-icon {

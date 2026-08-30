@@ -199,6 +199,7 @@ function switchTab(tab) {
         }
     }
 }
+
 /* ==========================================
    SIDEBAR, ACTIVE BANNER & FILE STATE
    ========================================== */
@@ -647,17 +648,19 @@ function setupEventDelegation() {
 /* ==========================================
    DATA LOADING & OCCUPATION LOGIC
    ========================================== */
+async function fetchGuestsList() {
+    const response = await fetch('/api/guests');
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+    const data = await response.json();
+    return data.guests || data || [];
+}
+
 async function loadGuests() {
     try {
-        const response = await fetch('/api/guests');
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-        const data = await response.json();
-
-        guests = (data.guests || data || []);
-
+        guests = await fetchGuestsList();
         populateTableDropdown();
         applyFilters();
-        loadTableOccupation();
+        await loadTableOccupation();
     } catch (error) {
         console.error('Failed to load guest list:', error);
     }
