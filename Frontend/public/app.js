@@ -14,6 +14,12 @@ let globalOccupationData = [];
 // Web Audio API context for audio feedback
 let audioCtx = null;
 
+// Helper function para linisin ang timestamp at random numbers sa filenames
+function formatFileName(filename) {
+    if (!filename) return '';
+    return filename.replace(/-\d+-\d+(?=\.[^.]+$)/, '');
+}
+
 function playSwitchSound(type = 'click') {
     try {
         if (!audioCtx) {
@@ -373,7 +379,10 @@ async function selectAndLoadFile(fileName) {
 async function removeRecentFile(e, fileName) {
     if (e) e.stopPropagation();
 
-    if (!confirm(`Are you sure you want to delete "${fileName}"? This will clear all guest records from the database.`)) {
+    // Linisin ang file name para maging maayos sa user-facing confirm prompt
+    const cleanFileName = formatFileName(fileName);
+
+    if (!confirm(`Are you sure you want to delete "${cleanFileName}"?\n\nThis will clear all guest records associated with this file.`)) {
         return;
     }
 
