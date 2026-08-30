@@ -12,14 +12,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists on server start
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Preserve file identities with unique timestamps to prevent collisions
-const storage = multer.diskStorage({
+/* ==========================================
+   MULTER CONFIGURATION (HYBRID DISK / MEMORY)
+   ========================================== */
+// Standard disk storage for persistent uploaded physical files
+const diskStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
@@ -29,23 +32,42 @@ const storage = multer.diskStorage({
     }
 });
 
+// Primary file upload handler (supports disk + memory buffer backup for cloud platforms like Render)
 const upload = multer({ 
-    storage,
-    limits: { fileSize: 10 * 1024 * 1024 }
+    storage: diskStorage,
+    limits: { fileSize: 15 * 1024 * 1024 } // 15MB Limit
+});
+
+// Memory storage instance specifically for direct file stream imports
+const memoryUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 15 * 1024 * 1024 }
 });
 
 app.use(express.json());
-// Serves frontend styles and assets
-app.use(express.static(path.join(__dirname, '..', 'Frontend', 'public')));
 
-// Initialize Database connection via better-sqlite3
+/* ==========================================
+   RESPONSIVE DYNAMIC STATIC FILE SERVING
+   ========================================== */
+// Auto-detect public folder location across different deployment setups
+const possiblePublicPaths = [
+    path.join(__dirname, '..', 'Frontend', 'public'),
+    path.join(__dirname, 'public'),
+    path.join(__dirname, '..', 'public')
+];
+
+let publicPath = possiblePublicPaths.find(p => fs.existsSync(p)) || possiblePublicPaths[0];
+app.use(express.static(publicPath));
+
+/* ==========================================
+   DATABASE INITIALIZATION & MIGRATIONS
+   ========================================== */
 const dbPath = path.join(__dirname, 'events.db');
 const db = new Database(dbPath);
 
-// Enable WAL mode for better concurrency performance
+// Enable Write-Ahead Logging (WAL) for faster execution & concurrent reads/writes
 db.pragma('journal_mode = WAL');
 
-// Initialize DB schema safely
 db.exec(`
     CREATE TABLE IF NOT EXISTS guests (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +81,7 @@ db.exec(`
     )
 `);
 
-// Schema Migration Check
+// Dynamic Schema Migration Check
 const columns = db.pragma('table_info(guests)');
 const hasQrCode = columns.some(col => col.name === 'qr_code');
 if (!hasQrCode) {
@@ -103,8 +125,17 @@ async function generateQrCodeDataUrl(payloadObj) {
     }
 }
 
-function parseAndInsertExcel(filePath) {
-    const workbook = XLSX.readFile(filePath);
+// Flexible Excel Parser that supports both File Paths and RAM Buffers
+function parseAndInsertExcel(fileInput) {
+    let workbook;
+    if (Buffer.isBuffer(fileInput)) {
+        workbook = XLSX.read(fileInput, { type: 'buffer' });
+    } else if (typeof fileInput === 'string') {
+        workbook = XLSX.readFile(fileInput);
+    } else {
+        throw new Error('Invalid file payload provided.');
+    }
+
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     
@@ -145,7 +176,7 @@ function clearGuestsTable() {
     try {
         db.prepare("DELETE FROM sqlite_sequence WHERE name='guests'").run();
     } catch (err) {
-        // Safe to ignore if sqlite_sequence table does not exist yet
+        // Safe to ignore if sqlite_sequence table does not exist
     }
 }
 
@@ -159,7 +190,6 @@ async function bulkInsertGuests(guests) {
         `UPDATE guests SET qr_code = ? WHERE id = ?`
     );
 
-    // Synchronous Batch Transaction via better-sqlite3
     const insertTransaction = db.transaction(async (guestList) => {
         for (const g of guestList) {
             const res = insertStmt.run(g.name, g.nickname, g.category, g.seat_plan, null);
@@ -279,7 +309,7 @@ async function processQrScanCheckIn(qrPayload) {
 }
 
 /* ==========================================
-   SOCKET.IO REAL-TIME CHECK-IN LOGIC
+   SOCKET.IO REAL-TIME CHECK-IN LISTENERS
    ========================================== */
 io.on('connection', (socket) => {
     socket.on('checkIn', ({ id }) => {
@@ -603,28 +633,54 @@ app.delete('/api/guests/:id', (req, res) => {
     }
 });
 
-app.post('/api/import', upload.single('file'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+/* ==========================================
+   UPDATED /API/IMPORT ENDPOINT (DYNAMIC DISK/MEMORY)
+   ========================================== */
+app.post('/api/import', (req, res) => {
+    // Dynamically fallback to memory upload if disk-write fails or is restricted on Render
+    upload.single('file')(req, res, async (err) => {
+        if (err || !req.file) {
+            // Memory storage retry logic
+            return memoryUpload.single('file')(req, res, async (memErr) => {
+                if (memErr || !req.file) {
+                    return res.status(400).json({ error: 'File upload failed. Please send a valid Excel (.xlsx) file.' });
+                }
+                await processImportFile(req, res);
+            });
+        }
+        await processImportFile(req, res);
+    });
+});
 
+async function processImportFile(req, res) {
     try {
-        const importedGuests = parseAndInsertExcel(req.file.path);
+        // Read either buffer memory or file path based on upload type
+        const fileData = req.file.buffer ? req.file.buffer : req.file.path;
+        const importedGuests = parseAndInsertExcel(fileData);
 
         if (importedGuests.length === 0) {
-            safeUnlink(req.file.path);
-            return res.status(400).json({ error: 'No valid guests found.' });
+            if (req.file.path) safeUnlink(req.file.path);
+            return res.status(400).json({ error: 'No valid guests found in the file.' });
         }
 
         clearGuestsTable();
         await bulkInsertGuests(importedGuests);
 
+        // Clean up temporary disk file if applicable
+        if (req.file.path) safeUnlink(req.file.path);
+
         triggerRealtimeUpdates();
-        res.json({ success: true, count: importedGuests.length, activeFile: req.file.originalname });
+        res.json({ 
+            success: true, 
+            count: importedGuests.length, 
+            activeFile: req.file.originalname 
+        });
     } catch (error) {
-        console.error('Import Error:', error);
-        if (req.file) safeUnlink(req.file.path);
-        res.status(500).json({ error: 'Failed to process Excel file.' });
+        console.error('Import Processing Error:', error);
+        if (req.file && req.file.path) safeUnlink(req.file.path);
+        res.status(500).json({ error: 'Failed to process Excel file. Please verify file formatting.' });
     }
-});
+}
 
 app.get('/api/export', (req, res) => {
     const format = (req.query.format || 'excel').toLowerCase();
