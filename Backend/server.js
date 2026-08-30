@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const path = require('path');
@@ -38,36 +38,16 @@ app.use(express.json());
 // Serves frontend styles and assets
 app.use(express.static(path.join(__dirname, '..', 'Frontend', 'public')));
 
+// Initialize Database connection via better-sqlite3
 const dbPath = path.join(__dirname, 'events.db');
-const db = new sqlite3.Database(dbPath);
+const db = new Database(dbPath);
 
-/* ==========================================
-   SQLITE PROMISIFIED HELPER WRAPPERS
-   ========================================== */
-const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-        if (err) return reject(err);
-        resolve(this);
-    });
-});
-
-const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-    });
-});
-
-const dbAll = (sql, params = []) => new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows || []);
-    });
-});
+// Enable WAL mode for better concurrency performance
+db.pragma('journal_mode = WAL');
 
 // Initialize DB schema safely
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS guests (
+db.exec(`
+    CREATE TABLE IF NOT EXISTS guests (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         nickname TEXT,
@@ -76,26 +56,15 @@ db.serialize(() => {
         status TEXT DEFAULT 'Not Checked-In',
         check_in_time TEXT,
         qr_code TEXT
-    )`, (err) => {
-        if (err) {
-            console.error('Error creating guests table:', err.message);
-            return;
-        }
+    )
+`);
 
-        db.all(`PRAGMA table_info(guests)`, (err, columns) => {
-            if (err) {
-                console.error('Error reading schema info:', err.message);
-                return;
-            }
-            const hasQrCode = columns && columns.some(col => col.name === 'qr_code');
-            if (!hasQrCode) {
-                db.run(`ALTER TABLE guests ADD COLUMN qr_code TEXT`, (alterErr) => {
-                    if (alterErr) console.error('Error adding qr_code column:', alterErr.message);
-                });
-            }
-        });
-    });
-});
+// Schema Migration Check
+const columns = db.pragma('table_info(guests)');
+const hasQrCode = columns.some(col => col.name === 'qr_code');
+if (!hasQrCode) {
+    db.exec(`ALTER TABLE guests ADD COLUMN qr_code TEXT`);
+}
 
 /* ==========================================
    HELPER FUNCTIONS & REAL-TIME EMITTERS
@@ -171,10 +140,10 @@ function parseAndInsertExcel(filePath) {
     return importedGuests;
 }
 
-async function clearGuestsTable() {
-    await dbRun('DELETE FROM guests');
+function clearGuestsTable() {
+    db.prepare('DELETE FROM guests').run();
     try {
-        await dbRun("DELETE FROM sqlite_sequence WHERE name='guests'");
+        db.prepare("DELETE FROM sqlite_sequence WHERE name='guests'").run();
     } catch (err) {
         // Safe to ignore if sqlite_sequence table does not exist yet
     }
@@ -183,30 +152,27 @@ async function clearGuestsTable() {
 async function bulkInsertGuests(guests) {
     if (!guests || guests.length === 0) return;
 
-    await dbRun('BEGIN TRANSACTION');
-    try {
-        for (const g of guests) {
-            const insertResult = await dbRun(
-                `INSERT INTO guests (name, nickname, category, seat_plan, qr_code) VALUES (?, ?, ?, ?, ?)`,
-                [g.name, g.nickname, g.category, g.seat_plan, null]
-            );
+    const insertStmt = db.prepare(
+        `INSERT INTO guests (name, nickname, category, seat_plan, qr_code) VALUES (?, ?, ?, ?, ?)`
+    );
+    const updateQrStmt = db.prepare(
+        `UPDATE guests SET qr_code = ? WHERE id = ?`
+    );
 
-            const insertedId = insertResult.lastID;
+    // Synchronous Batch Transaction via better-sqlite3
+    const insertTransaction = db.transaction(async (guestList) => {
+        for (const g of guestList) {
+            const res = insertStmt.run(g.name, g.nickname, g.category, g.seat_plan, null);
+            const insertedId = res.lastInsertRowid;
             const qrDataUrl = await generateQrCodeDataUrl({ id: insertedId, name: g.name, table: g.seat_plan });
-
-            await dbRun(
-                `UPDATE guests SET qr_code = ? WHERE id = ?`,
-                [qrDataUrl, insertedId]
-            );
+            updateQrStmt.run(qrDataUrl, insertedId);
         }
-        await dbRun('COMMIT');
-    } catch (err) {
-        await dbRun('ROLLBACK');
-        throw err;
-    }
+    });
+
+    await insertTransaction(guests);
 }
 
-async function notifyTableOccupationChange() {
+function notifyTableOccupationChange() {
     const query = `
         SELECT 
             seat_plan AS table_name,
@@ -217,14 +183,14 @@ async function notifyTableOccupationChange() {
         ORDER BY seat_plan ASC
     `;
     try {
-        const rows = await dbAll(query);
+        const rows = db.prepare(query).all();
         io.emit('tableOccupationUpdated', { tables: rows });
     } catch (err) {
         console.error('Error in notifyTableOccupationChange:', err.message);
     }
 }
 
-async function notifyDashboardMetricsChange() {
+function notifyDashboardMetricsChange() {
     const query = `
         SELECT 
             COUNT(*) AS total_guests,
@@ -234,7 +200,7 @@ async function notifyDashboardMetricsChange() {
         FROM guests
     `;
     try {
-        const row = await dbGet(query);
+        const row = db.prepare(query).get();
         io.emit('dashboardMetricsUpdated', {
             total_guests: row ? row.total_guests || 0 : 0,
             checked_in: row ? row.checked_in || 0 : 0,
@@ -275,23 +241,18 @@ async function processQrScanCheckIn(qrPayload) {
         second: '2-digit' 
     });
 
-    let findQuery = '';
-    let queryParams = [];
+    let guest = null;
 
     if (parsedData.id) {
-        findQuery = 'SELECT * FROM guests WHERE id = ?';
-        queryParams = [parsedData.id];
+        guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(parsedData.id);
     } else if (parsedData.name) {
-        findQuery = 'SELECT * FROM guests WHERE LOWER(name) = LOWER(?)';
-        queryParams = [parsedData.name.trim()];
+        guest = db.prepare('SELECT * FROM guests WHERE LOWER(name) = LOWER(?)').get(parsedData.name.trim());
     } else if (parsedData.raw) {
-        findQuery = 'SELECT * FROM guests WHERE id = ? OR LOWER(name) = LOWER(?)';
-        queryParams = [parsedData.raw, parsedData.raw.trim()];
+        guest = db.prepare('SELECT * FROM guests WHERE id = ? OR LOWER(name) = LOWER(?)').get(parsedData.raw, parsedData.raw.trim());
     } else {
         throw new Error('QR Code contains missing guest information.');
     }
 
-    const guest = await dbGet(findQuery, queryParams);
     if (!guest) throw new Error('Guest not found in database.');
 
     if (guest.status === 'Checked-In') {
@@ -302,10 +263,7 @@ async function processQrScanCheckIn(qrPayload) {
         };
     }
 
-    await dbRun(
-        `UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`,
-        [checkInTimeStr, guest.id]
-    );
+    db.prepare(`UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`).run(checkInTimeStr, guest.id);
 
     const updatedGuest = { ...guest, status: 'Checked-In', check_in_time: checkInTimeStr };
     
@@ -324,7 +282,7 @@ async function processQrScanCheckIn(qrPayload) {
    SOCKET.IO REAL-TIME CHECK-IN LOGIC
    ========================================== */
 io.on('connection', (socket) => {
-    socket.on('checkIn', async ({ id }) => {
+    socket.on('checkIn', ({ id }) => {
         const checkInTimeStr = new Date().toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit', 
@@ -332,10 +290,7 @@ io.on('connection', (socket) => {
         });
 
         try {
-            const res = await dbRun(
-                `UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`,
-                [checkInTimeStr, id]
-            );
+            const res = db.prepare(`UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`).run(checkInTimeStr, id);
             if (res.changes > 0) {
                 io.emit('guestUpdated', { id, status: 'Checked-In', check_in_time: checkInTimeStr });
                 notifyTableOccupationChange();
@@ -346,12 +301,9 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('uncheckIn', async ({ id }) => {
+    socket.on('uncheckIn', ({ id }) => {
         try {
-            const res = await dbRun(
-                `UPDATE guests SET status = 'Not Checked-In', check_in_time = NULL WHERE id = ?`,
-                [id]
-            );
+            const res = db.prepare(`UPDATE guests SET status = 'Not Checked-In', check_in_time = NULL WHERE id = ?`).run(id);
             if (res.changes > 0) {
                 io.emit('guestUpdated', { id, status: 'Not Checked-In', check_in_time: null });
                 notifyTableOccupationChange();
@@ -386,7 +338,7 @@ io.on('connection', (socket) => {
    REST API ENDPOINTS
    ========================================== */
 
-app.get('/api/dashboard-summary', async (req, res) => {
+app.get('/api/dashboard-summary', (req, res) => {
     const query = `
         SELECT 
             COUNT(*) AS total_guests,
@@ -396,7 +348,7 @@ app.get('/api/dashboard-summary', async (req, res) => {
         FROM guests
     `;
     try {
-        const row = await dbGet(query);
+        const row = db.prepare(query).get();
         res.json({
             total_guests: row ? row.total_guests || 0 : 0,
             checked_in: row ? row.checked_in || 0 : 0,
@@ -408,9 +360,9 @@ app.get('/api/dashboard-summary', async (req, res) => {
     }
 });
 
-app.get('/api/guests', async (req, res) => {
+app.get('/api/guests', (req, res) => {
     try {
-        const rows = await dbAll('SELECT * FROM guests ORDER BY name ASC');
+        const rows = db.prepare('SELECT * FROM guests ORDER BY name ASC').all();
         res.json({ guests: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -427,15 +379,14 @@ app.post('/api/guests', async (req, res) => {
     const guestSeat = seat_plan || 'Unassigned';
 
     try {
-        const result = await dbRun(
-            `INSERT INTO guests (name, nickname, category, seat_plan) VALUES (?, ?, ?, ?)`,
-            [name, nickname || '', guestCategory, guestSeat]
-        );
+        const result = db.prepare(
+            `INSERT INTO guests (name, nickname, category, seat_plan) VALUES (?, ?, ?, ?)`
+        ).run(name, nickname || '', guestCategory, guestSeat);
 
-        const newId = result.lastID;
+        const newId = result.lastInsertRowid;
         const qrDataUrl = await generateQrCodeDataUrl({ id: newId, name, table: guestSeat });
 
-        await dbRun(`UPDATE guests SET qr_code = ? WHERE id = ?`, [qrDataUrl, newId]);
+        db.prepare(`UPDATE guests SET qr_code = ? WHERE id = ?`).run(qrDataUrl, newId);
         triggerRealtimeUpdates();
         res.json({ success: true, id: newId, qrCode: qrDataUrl });
     } catch (err) {
@@ -443,7 +394,7 @@ app.post('/api/guests', async (req, res) => {
     }
 });
 
-app.post('/api/guests/batch-checkin', async (req, res) => {
+app.post('/api/guests/batch-checkin', (req, res) => {
     const { ids, status } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
         return res.status(400).json({ error: 'Invalid or empty IDs array.' });
@@ -459,7 +410,7 @@ app.post('/api/guests/batch-checkin', async (req, res) => {
     const params = [isCheckIn ? 'Checked-In' : 'Not Checked-In', checkInTimeStr, ...ids];
 
     try {
-        const result = await dbRun(sql, params);
+        const result = db.prepare(sql).run(...params);
         triggerRealtimeUpdates();
         res.json({ success: true, updatedCount: result.changes });
     } catch (err) {
@@ -483,9 +434,9 @@ app.post('/api/scan-checkin', async (req, res) => {
     }
 });
 
-app.delete('/api/guests/all', async (req, res) => {
+app.delete('/api/guests/all', (req, res) => {
     try {
-        await clearGuestsTable();
+        clearGuestsTable();
         triggerRealtimeUpdates();
         res.json({ success: true, message: 'All guest records cleared.' });
     } catch (err) {
@@ -497,7 +448,7 @@ app.get('/api/guests/:id/qrcode', async (req, res) => {
     const guestId = req.params.id;
 
     try {
-        const guest = await dbGet('SELECT * FROM guests WHERE id = ?', [guestId]);
+        const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId);
         if (!guest) return res.status(404).json({ error: 'Guest not found.' });
 
         if (guest.qr_code) {
@@ -511,7 +462,7 @@ app.get('/api/guests/:id/qrcode', async (req, res) => {
         };
 
         const qrDataUrl = await generateQrCodeDataUrl(qrPayload);
-        await dbRun('UPDATE guests SET qr_code = ? WHERE id = ?', [qrDataUrl, guestId]);
+        db.prepare('UPDATE guests SET qr_code = ? WHERE id = ?').run(qrDataUrl, guestId);
 
         res.json({ id: guest.id, qrCode: qrDataUrl });
     } catch (err) {
@@ -520,7 +471,7 @@ app.get('/api/guests/:id/qrcode', async (req, res) => {
     }
 });
 
-app.get('/api/table-occupation', async (req, res) => {
+app.get('/api/table-occupation', (req, res) => {
     const query = `
         SELECT 
             seat_plan AS table_name,
@@ -532,17 +483,17 @@ app.get('/api/table-occupation', async (req, res) => {
     `;
 
     try {
-        const rows = await dbAll(query);
+        const rows = db.prepare(query).all();
         res.json({ tables: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/api/table-guests/:tableName', async (req, res) => {
+app.get('/api/table-guests/:tableName', (req, res) => {
     const tableName = req.params.tableName;
     try {
-        const rows = await dbAll(`SELECT * FROM guests WHERE seat_plan = ? ORDER BY name ASC`, [tableName]);
+        const rows = db.prepare(`SELECT * FROM guests WHERE seat_plan = ? ORDER BY name ASC`).all(tableName);
         res.json({ table_name: tableName, guests: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -574,7 +525,7 @@ app.get('/api/recent-files', (req, res) => {
 });
 
 app.post('/api/load-file', async (req, res) => {
-    const fileName = req.query.name;
+    const fileName = req.query.name || req.body.fileName;
     if (!fileName) return res.status(400).json({ error: 'Filename is required.' });
 
     const safeFileName = path.basename(fileName);
@@ -586,7 +537,7 @@ app.post('/api/load-file', async (req, res) => {
 
     try {
         const importedGuests = parseAndInsertExcel(filePath);
-        await clearGuestsTable();
+        clearGuestsTable();
         await bulkInsertGuests(importedGuests);
 
         triggerRealtimeUpdates();
@@ -597,7 +548,7 @@ app.post('/api/load-file', async (req, res) => {
     }
 });
 
-app.delete('/api/recent-files/:fileName', async (req, res) => {
+app.delete('/api/recent-files/:fileName', (req, res) => {
     const rawFileName = decodeURIComponent(req.params.fileName);
     const safeFileName = path.basename(rawFileName);
     const filePath = path.join(uploadDir, safeFileName);
@@ -611,7 +562,7 @@ app.delete('/api/recent-files/:fileName', async (req, res) => {
     }
 
     try {
-        await clearGuestsTable();
+        clearGuestsTable();
         triggerRealtimeUpdates();
 
         return res.json({ 
@@ -631,10 +582,9 @@ app.put('/api/guests/:id', async (req, res) => {
     try {
         const qrDataUrl = await generateQrCodeDataUrl({ id: guestId, name, table: seat_plan });
 
-        await dbRun(
-            `UPDATE guests SET name = ?, nickname = ?, category = ?, seat_plan = ?, qr_code = ? WHERE id = ?`,
-            [name, nickname, category, seat_plan, qrDataUrl, guestId]
-        );
+        db.prepare(
+            `UPDATE guests SET name = ?, nickname = ?, category = ?, seat_plan = ?, qr_code = ? WHERE id = ?`
+        ).run(name, nickname, category, seat_plan, qrDataUrl, guestId);
 
         triggerRealtimeUpdates();
         res.json({ success: true, qrCode: qrDataUrl });
@@ -643,9 +593,9 @@ app.put('/api/guests/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/guests/:id', async (req, res) => {
+app.delete('/api/guests/:id', (req, res) => {
     try {
-        await dbRun(`DELETE FROM guests WHERE id = ?`, [req.params.id]);
+        db.prepare(`DELETE FROM guests WHERE id = ?`).run(req.params.id);
         triggerRealtimeUpdates();
         res.json({ success: true });
     } catch (err) {
@@ -664,7 +614,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No valid guests found.' });
         }
 
-        await clearGuestsTable();
+        clearGuestsTable();
         await bulkInsertGuests(importedGuests);
 
         triggerRealtimeUpdates();
@@ -676,11 +626,11 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
     }
 });
 
-app.get('/api/export', async (req, res) => {
+app.get('/api/export', (req, res) => {
     const format = (req.query.format || 'excel').toLowerCase();
 
     try {
-        const rows = await dbAll('SELECT * FROM guests ORDER BY name ASC');
+        const rows = db.prepare('SELECT * FROM guests ORDER BY name ASC').all();
 
         const formattedRows = rows.map(r => ({
             "Name": r.name || '',
@@ -785,15 +735,15 @@ function gracefulShutdown(signal) {
 
     server.close(() => {
         console.log('HTTP/WebSocket server closed.');
-        db.close((err) => {
+        try {
+            db.close();
             clearTimeout(forceExitTimeout);
-            if (err) {
-                console.error('Error closing SQLite DB:', err.message);
-                process.exit(1);
-            }
             console.log('Database connection closed. Exiting process.');
             process.exit(0);
-        });
+        } catch (err) {
+            console.error('Error closing SQLite DB:', err.message);
+            process.exit(1);
+        }
     });
 }
 

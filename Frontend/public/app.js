@@ -157,24 +157,28 @@ function switchTab(tab) {
     const sidebarQrSection = document.getElementById('sidebarQrSection');
 
     if (tab === 'dashboard') {
-        if (mainDashboardView) mainDashboardView.style.display = 'block';
-        if (mainTablesView) mainTablesView.style.display = 'none';
+        if (mainDashboardView) mainDashboardView.classList.remove('hidden');
+        if (mainTablesView) mainTablesView.classList.add('hidden');
         if (btnNavDashboard) btnNavDashboard.classList.add('active');
         if (btnNavTables) btnNavTables.classList.remove('active');
         if (mainTitle) mainTitle.textContent = 'Dashboard';
 
         // Itatago ang Sidebar QR code kapag nasa Dashboard view
-        if (sidebarQrSection) sidebarQrSection.style.display = 'none';
+        if (sidebarQrSection) sidebarQrSection.classList.add('hidden');
     } else if (tab === 'tables') {
-        if (mainDashboardView) mainDashboardView.style.display = 'none';
-        if (mainTablesView) mainTablesView.style.display = 'block';
+        if (mainDashboardView) mainDashboardView.classList.add('hidden');
+        if (mainTablesView) mainTablesView.classList.remove('hidden');
         if (btnNavDashboard) btnNavDashboard.classList.remove('active');
         if (btnNavTables) btnNavTables.classList.add('active');
         if (mainTitle) mainTitle.textContent = 'Seating Capacity Overview';
         
         // Kung nasa URL hash `#seating` (view mode ng bisita/mag-i-iscan), itago rin ang QR code sa sidebar
         if (sidebarQrSection) {
-            sidebarQrSection.style.display = window.location.hash === '#seating' ? 'none' : 'block';
+            if (window.location.hash === '#seating') {
+                sidebarQrSection.classList.add('hidden');
+            } else {
+                sidebarQrSection.classList.remove('hidden');
+            }
         }
         
         loadTableOccupation();
@@ -293,7 +297,7 @@ function renderRecentFilesSidebar() {
     const recentFiles = getRecentFiles();
 
     if (recentFiles.length === 0) {
-        container.innerHTML = `<span class="empty-state" style="font-size:0.8rem; opacity:0.6;">No recent files</span>`;
+        container.innerHTML = `<p class="empty-state">No recent files</p>`;
         return;
     }
 
@@ -306,13 +310,13 @@ function renderRecentFilesSidebar() {
         const escapedName = escapeHtml(fileName);
 
         return `
-            <div class="recent-file-item ${isCurrent ? 'active' : ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; margin-bottom: 6px; background: var(--card-bg, rgba(255,255,255,0.05)); border-radius: 6px;">
-                <span class="recent-file-name" title="${escapedName}" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;">
-                    📄 ${escapedName}
+            <div class="recent-file-item ${isCurrent ? 'active' : ''}">
+                <span class="recent-file-name" title="${escapedName}">
+                    <i class="fa-regular fa-file-excel" style="color: var(--success-color);"></i> ${escapedName}
                 </span>
                 <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                    <button class="btn-load-file btn ${buttonClass}" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px; font-weight: 600;" ${disabledAttr} data-file-name="${escapedName}">${buttonText}</button>
-                    <button class="btn-remove-chip btn-delete-file" data-file-name="${escapedName}" title="Remove file" style="border:none; background:transparent; cursor:pointer; color:#ef4444; font-weight:bold; font-size: 1rem; padding: 0 2px; line-height: 1;">&times;</button>
+                    <button class="btn-load-file btn ${buttonClass}" style="padding: 2px 8px; font-size: 0.72rem;" ${disabledAttr} data-file-name="${escapedName}">${buttonText}</button>
+                    <button class="btn-remove-chip btn-delete-file" data-file-name="${escapedName}" title="Remove file">&times;</button>
                 </div>
             </div>
         `;
@@ -373,13 +377,13 @@ async function removeRecentFile(e, fileName) {
         // Alisin sa array ng loadedFiles
         loadedFiles = loadedFiles.filter(f => f !== fileName);
         
-        // SURIN KUNG ANG BINURANG FILE AY ANG KASALUKUYANG ACTIVE FILE
+        // SURIIN KUNG ANG BINURANG FILE AY ANG KASALUKUYANG ACTIVE FILE
         if (currentActiveFile === fileName) {
             // Piliin ang pinakahuling natirang file (kung mayroon)
             const remainingFile = loadedFiles.length > 0 ? loadedFiles[loadedFiles.length - 1] : '';
             currentActiveFile = remainingFile;
 
-            // KUNG MAY NATIRANG FILE,I-LOAD AT I-SYNC ITO SA BACKEND AGAD
+            // KUNG MAY NATIRANG FILE, I-LOAD AT I-SYNC ITO SA BACKEND AGAD
             if (remainingFile) {
                 await selectAndLoadFile(remainingFile);
             } else {
@@ -427,15 +431,15 @@ function renderDashboardActiveBanner() {
         const escapedName = escapeHtml(name);
 
         return `
-            <span class="file-chip" style="display:inline-flex; align-items:center; gap:6px; background:var(--primary-color, #2563eb); color:#ffffff; padding:4px 10px; border-radius:14px; font-size:0.8rem; font-weight:500;">
-                📄 ${escapedName}
-                <button type="button" class="btn-remove-chip" data-file-name="${escapedName}" title="Remove File" style="border:none; background:none; color:#ffffff; cursor:pointer; font-weight:bold; font-size:0.9rem; line-height:1; padding:0;">&times;</button>
+            <span class="file-chip">
+                <i class="fa-solid fa-file-excel"></i> ${escapedName}
+                <button type="button" class="btn-remove-chip" data-file-name="${escapedName}" title="Remove File">&times;</button>
             </span>
         `;
     }).join(' ');
 
     container.innerHTML = `
-        <div class="active-file-container" style="padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); color: var(--text-color, #1e293b); transition: background-color 0.3s ease, color 0.3s ease;">
+        <div class="active-file-container">
             <div style="font-size: 0.9rem; font-weight: 500;">
                 You are selecting: <span style="font-weight: 700; text-decoration: underline;">${escapeHtml(activeTitle)}</span>
             </div>
@@ -713,14 +717,14 @@ function renderTableOccupation(tables) {
             <div class="table-card-item table-occupation-card ${isFull ? 'table-full' : ''}" 
                  data-table-name="${escapeHtml(tableName)}" 
                  title="Click to filter guest list">
-                <div class="table-occupation-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <strong style="font-size: 1rem;">${escapeHtml(tableName)}</strong>
-                    <span class="table-count-badge" style="font-size: 0.85rem; font-weight:600;">
+                <div class="table-occupation-header">
+                    <strong>${escapeHtml(tableName)}</strong>
+                    <span class="table-count-badge">
                         ${checked} / ${total}
                     </span>
                 </div>
-                <div class="table-progress-bar-bg" style="width:100%; height:8px; background:var(--border-color, #e5e7eb); border-radius:4px; overflow:hidden;">
-                    <div class="table-progress-bar-fill" style="width: ${percentage}%; height:100%; background:#10b981; transition: width 0.3s ease;"></div>
+                <div class="table-progress-bar-bg">
+                    <div class="table-progress-bar-fill" style="width: ${percentage}%;"></div>
                 </div>
             </div>
         `;
@@ -737,14 +741,14 @@ function renderTableOccupation(tables) {
             <div class="table-card-item table-occupation-card ${isFull ? 'table-full' : ''}" 
                  data-table-name="${escapeHtml(tableName)}" 
                  title="Click to view guests">
-                <div class="table-occupation-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <strong style="font-size: 1rem;">${escapeHtml(tableName)}</strong>
-                    <span class="table-count-badge" style="font-size: 0.85rem; font-weight:600;">
-                        <strong style="color: #10b981;">${checked}</strong> / ${total}
+                <div class="table-occupation-header">
+                    <strong>${escapeHtml(tableName)}</strong>
+                    <span class="table-count-badge">
+                        <strong>${checked}</strong> / ${total}
                     </span>
                 </div>
-                <div class="table-progress-bar-bg" style="width:100%; height:8px; background:var(--border-color, #e5e7eb); border-radius:4px; overflow:hidden;">
-                    <div class="table-progress-bar-fill" style="width: ${percentage}%; height:100%; background:#10b981; transition: width 0.3s ease;"></div>
+                <div class="table-progress-bar-bg">
+                    <div class="table-progress-bar-fill" style="width: ${percentage}%;"></div>
                 </div>
             </div>
         `;
@@ -766,8 +770,8 @@ async function openTableModal(tableName) {
 
     if (titleEl) titleEl.textContent = `Seating Overview: ${tableName}`;
 
-    listEl.innerHTML = '<li class="empty-state">Loading guests</li>';
-    modal.style.display = 'flex';
+    listEl.innerHTML = '<li class="empty-state">Loading guests...</li>';
+    modal.classList.remove('hidden');
 
     try {
         const res = await fetch(`/api/table-guests/${encodeURIComponent(tableName)}`);
@@ -775,19 +779,17 @@ async function openTableModal(tableName) {
         const tableGuests = data.guests || [];
 
         if (tableGuests.length === 0) {
-            listEl.innerHTML = `<li class="empty-state" style="padding: 12px 0; list-style: none;">No guests assigned to this table.</li>`;
+            listEl.innerHTML = `<li class="empty-state">No guests assigned to this table.</li>`;
         } else {
             listEl.innerHTML = tableGuests.map(g => {
                 const isCheckedIn = g.status === 'Checked-In';
                 
                 return `
-                    <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-color, #333);">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div>
-                                <strong>${escapeHtml(g.name)}</strong>
-                                ${g.nickname ? `<small style="opacity: 0.7; margin-left: 6px;">(${escapeHtml(g.nickname)})</small>` : ''}
-                                <div style="font-size: 0.75rem; color: var(--subtext-color, #888);">Category: ${escapeHtml(g.category || 'Guest')}</div>
-                            </div>
+                    <li class="table-guest-item ${isCheckedIn ? 'checked-in' : ''}">
+                        <div>
+                            <strong>${escapeHtml(g.name)}</strong>
+                            ${g.nickname ? `<small style="opacity: 0.7; margin-left: 6px;">(${escapeHtml(g.nickname)})</small>` : ''}
+                            <div style="font-size: 0.75rem; color: var(--subtext-color);">Category: ${escapeHtml(g.category || 'Guest')}</div>
                         </div>
                         <span class="status-indicator ${isCheckedIn ? 'status-checked' : 'status-pending'}" style="font-size: 0.85rem;">
                             ${escapeHtml(g.status || 'Not Checked-In')}
@@ -804,7 +806,7 @@ async function openTableModal(tableName) {
 
 function closeTableModal() {
     const modal = document.getElementById('tableGuestsModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.classList.add('hidden');
 }
 
 /* ==========================================
@@ -908,7 +910,7 @@ function renderTable(data) {
     if (data.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 20px; color: var(--subtext-color, #888);">
+                <td colspan="7" class="text-center" style="padding: 24px; color: var(--subtext-color);">
                     No guests found.
                 </td>
             </tr>
@@ -921,26 +923,26 @@ function renderTable(data) {
         const categoryClass = guest.category && guest.category.toUpperCase() === 'VIP' ? 'badge-vip' : 'badge-guest';
 
         const actionControls = !isCheckedIn ? `
-            <button class="btn btn-sm btn-primary btn-checkin">Check In</button>
-            <button class="btn btn-sm btn-outline btn-edit" title="Edit guest info">Edit</button>
-            <button class="btn btn-sm btn-danger btn-delete" title="Delete guest">Remove</button>
+            <button class="btn btn-checkin"><i class="fa-solid fa-check"></i> Check In</button>
+            <button class="btn btn-edit" title="Edit guest info"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="btn btn-delete" title="Delete guest"><i class="fa-solid fa-trash"></i></button>
         ` : `
-            <button class="btn btn-sm btn-success" disabled>✓ Done</button>
-            <button class="btn btn-sm btn-warning btn-undo" title="Undo check-in">Undo</button>
-            <button class="btn btn-sm btn-outline btn-edit" title="Edit guest info">Edit</button>
-            <button class="btn btn-sm btn-danger btn-delete" title="Delete guest">Remove</button>
+            <button class="btn btn-checkin" style="background-color: var(--success-color);" disabled><i class="fa-solid fa-check-double"></i> Done</button>
+            <button class="btn btn-undo" title="Undo check-in"><i class="fa-solid fa-rotate-left"></i> Undo</button>
+            <button class="btn btn-edit" title="Edit guest info"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button class="btn btn-delete" title="Delete guest"><i class="fa-solid fa-trash"></i></button>
         `;
 
         return `
             <tr id="guest-${guest.id}" data-id="${guest.id}" class="${isCheckedIn ? 'checked-in-row' : ''}">
                 <td><strong>${escapeHtml(guest.name)}</strong></td>
                 <td>${escapeHtml(guest.nickname || '-')}</td>
-                <td><span class="${categoryClass}">${escapeHtml(guest.category || 'Guest')}</span></td>
+                <td><span class="badge ${categoryClass}">${escapeHtml(guest.category || 'Guest')}</span></td>
                 <td>${escapeHtml(guest.seat_plan || 'Unassigned')}</td>
                 <td><span class="status-indicator ${isCheckedIn ? 'status-checked' : 'status-pending'}">${escapeHtml(guest.status || 'Not Checked-In')}</span></td>
                 <td class="time">${escapeHtml(guest.check_in_time || '-')}</td>
                 <td>
-                    <div style="display:flex; align-items:center; gap:6px;">
+                    <div class="action-buttons">
                         ${actionControls}
                     </div>
                 </td>
@@ -958,10 +960,13 @@ function uncheckIn(id) { socket.emit('uncheckIn', { id }); }
 function setupModalKeybinds() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            if (document.getElementById('editModal')?.style.display === 'flex') {
+            const editModal = document.getElementById('editModal');
+            const tableModal = document.getElementById('tableGuestsModal');
+
+            if (editModal && !editModal.classList.contains('hidden')) {
                 closeEditModal();
             }
-            if (document.getElementById('tableGuestsModal')?.style.display === 'flex') {
+            if (tableModal && !tableModal.classList.contains('hidden')) {
                 closeTableModal();
             }
         }
@@ -980,7 +985,7 @@ function openAddGuestModal() {
 
     const modal = document.getElementById('editModal');
     if (modal) {
-        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
         document.getElementById('editName').focus();
     }
 }
@@ -1000,14 +1005,14 @@ function editGuest(id) {
 
     const modal = document.getElementById('editModal');
     if (modal) {
-        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
         document.getElementById('editName').focus();
     }
 }
 
 function closeEditModal() {
     const modal = document.getElementById('editModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.classList.add('hidden');
 }
 
 async function saveGuestEdit(e) {

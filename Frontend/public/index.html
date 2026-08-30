@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Events By Anj</title>
+    <title>Events By Anj - Guest Management</title>
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="dark-theme">
 
     <!-- Overlay for mobile sidebar navigation -->
     <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
@@ -16,27 +19,28 @@
         <!-- Navigation Sidebar -->
         <aside class="sidebar" id="appSidebar" aria-label="Main Navigation">
             <div class="sidebar-header">
+                <i class="fa-solid fa-calendar-check brand-icon"></i>
                 <h2>Events By Anj</h2>
             </div>
 
             <nav class="sidebar-section">
-                <span class="sidebar-label" id="navLabel">Navigation</span>
+                <span class="sidebar-label" id="navLabel">NAVIGATION</span>
                 <div class="sidebar-menu" role="group" aria-labelledby="navLabel">
                     <button type="button" id="btnNavDashboard" class="sidebar-nav-btn active">
-                        Main Dashboard
+                        <i class="fa-solid fa-chart-pie"></i> Main Dashboard
                     </button>
                     <button type="button" id="btnNavTables" class="sidebar-nav-btn">
-                        Seating Capacity Overview
+                        <i class="fa-solid fa-chair"></i> Seating Capacity Overview
                     </button>
                 </div>
             </nav>
 
             <div class="sidebar-section">
-                <label for="excelFile" class="sidebar-label">Import File</label>
+                <label for="excelFile" class="sidebar-label">IMPORT FILE</label>
                 <div id="drop-zone" class="drop-zone">
                     <div id="dropZonePrompt" class="drop-zone-prompt">
                         <div class="upload-placeholder">
-                            <span class="upload-icon" aria-hidden="true">📁</span>
+                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
                             <p> Add a File or <label for="excelFile" class="file-label">browse</label></p>
                         </div>
                     </div>
@@ -45,16 +49,16 @@
             </div>
 
             <div class="sidebar-section">
-                <span class="sidebar-label" id="recentFilesLabel">Recently Opened Files</span>
+                <span class="sidebar-label" id="recentFilesLabel">RECENTLY OPENED FILES</span>
                 <div id="recentFilesContainer" class="recent-files-container" aria-labelledby="recentFilesLabel">
                     <p class="empty-state">No recent files</p>
                 </div>
             </div>
 
-            <!-- SIDEBAR QR CODE SECTION (Lalabas lamang sa Seating Capacity Overview view) -->
+            <!-- SIDEBAR QR CODE SECTION -->
             <div class="sidebar-section" id="sidebarQrSection" style="display: none;">
-                <span class="sidebar-label">Scan for Mobile Access</span>
-                <div id="sidebarQrCodeContainer" class="sidebar-qr-container" style="display: flex; justify-content: center; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;"></div>
+                <span class="sidebar-label">SCAN FOR MOBILE ACCESS</span>
+                <div id="sidebarQrCodeContainer" class="sidebar-qr-container"></div>
             </div>
         </aside>
 
@@ -65,7 +69,7 @@
                 <div class="header-container">
                     <div class="header-title-group">
                         <button type="button" id="btnToggleSidebar" class="mobile-sidebar-toggle" aria-label="Toggle Navigation Sidebar" aria-controls="appSidebar" aria-expanded="false">
-                            ☰
+                            <i class="fa-solid fa-bars"></i>
                         </button>
                         <h1 id="mainTitle">Dashboard</h1>
                     </div>
@@ -100,84 +104,111 @@
             <!-- Dashboard Main View Panel -->
             <div id="mainDashboardView" class="view-panel">
                 <section class="stats-container" aria-label="Guest Statistics Summary">
-                    <div class="stat-card">Total Guests: <strong id="stat-total">0</strong></div>
-                    <div class="stat-card checked-in">Checked-In: <strong id="stat-checked">0</strong></div>
-                    <div class="stat-card not-checked">Not Checked-In: <strong id="stat-not-checked">0</strong></div>
-                </section>
-
-                <section class="controls" aria-label="Data Operations">
-                    <button type="button" id="btnAddGuest" class="btn btn-outline">+ Add Guest</button>
-                    <button type="button" id="btnSaveExcel" class="btn btn-secondary">Save Excel</button>
-                    <button type="button" id="btnSaveDocs" class="btn btn-primary">Save Docs</button>
-                </section>
-
-                <section class="filter-row" aria-label="Guest Filters and Sorting">
-                    <div class="search-group">
-                        <input 
-                            type="search" 
-                            id="search" 
-                            placeholder="Search by name or nickname..." 
-                            class="search-input" 
-                            aria-label="Search by name or nickname"
-                        />
+                    <div class="stat-card total-card">
+                        <div class="stat-content">
+                            <span class="stat-title">Total Guests</span>
+                            <strong id="stat-total" class="stat-num">0</strong>
+                        </div>
+                        <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
                     </div>
-
-                    <select id="filterCategory" class="filter-select" aria-label="Filter by Category">
-                        <option value="">All Categories</option>
-                        <option value="VIP">VIP</option>
-                        <option value="Guest">Guest</option>
-                    </select>
-
-                    <select id="filterTable" class="filter-select" aria-label="Filter by Table Number">
-                        <option value="">All Tables</option>
-                    </select>
-
-                    <!-- DYNAMIC SORT OPTIONS -->
-                    <select id="sortBy" class="filter-select" aria-label="Sort Guests By">
-                        <option value="name-asc">Sort by: Name (A-Z)</option>
-                        <option value="name-desc">Sort by: Name (Z-A)</option>
-                        <option value="table-asc">Sort by: Table (Ascending)</option>
-                        <option value="status-checked">Sort by: Checked-In First</option>
-                        <option value="status-unchecked">Sort by: Not Checked-In First</option>
-                        <option value="time-desc">Sort by: Latest Check-In</option>
-                    </select>
+                    <div class="stat-card checked-in">
+                        <div class="stat-content">
+                            <span class="stat-title">Checked-In</span>
+                            <strong id="stat-checked" class="stat-num">0</strong>
+                        </div>
+                        <div class="stat-icon"><i class="fa-solid fa-user-check"></i></div>
+                    </div>
+                    <div class="stat-card not-checked">
+                        <div class="stat-content">
+                            <span class="stat-title">Not Checked-In</span>
+                            <strong id="stat-not-checked" class="stat-num">0</strong>
+                        </div>
+                        <div class="stat-icon"><i class="fa-solid fa-user-clock"></i></div>
+                    </div>
                 </section>
 
+                <div class="table-wrapper-card">
+                    <section class="controls" aria-label="Data Operations">
+                        <div class="controls-left">
+                            <button type="button" id="btnAddGuest" class="btn btn-primary">
+                                <i class="fa-solid fa-plus"></i> Add Guest
+                            </button>
+                        </div>
+                        <div class="controls-right">
+                            <button type="button" id="btnSaveExcel" class="btn btn-success">
+                                <i class="fa-solid fa-file-excel"></i> Save Excel
+                            </button>
+                            <button type="button" id="btnSaveDocs" class="btn btn-secondary">
+                                <i class="fa-solid fa-file-word"></i> Save Docs
+                            </button>
+                        </div>
+                    </section>
 
-                <section class="table-container" aria-label="Guest List Table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th scope="col">Name</th>
-                                <th scope="col">Nickname</th>
-                                <th scope="col">Category</th>
-                                <th scope="col">Table No.</th>
-                                <th scope="col">Status</th>
-                                <th scope="col">Check-In Time</th>
-                                <th scope="col">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="guestTable">
-                        </tbody>
-                    </table>
-                </section>
+                    <section class="filter-row" aria-label="Guest Filters and Sorting">
+                        <div class="search-group">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input 
+                                type="search" 
+                                id="search" 
+                                placeholder="Search by name or nickname..." 
+                                class="search-input" 
+                                aria-label="Search by name or nickname"
+                            />
+                        </div>
+
+                        <select id="filterCategory" class="filter-select" aria-label="Filter by Category">
+                            <option value="">All Categories</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Guest">Guest</option>
+                        </select>
+
+                        <select id="filterTable" class="filter-select" aria-label="Filter by Table Number">
+                            <option value="">All Tables</option>
+                        </select>
+
+                        <select id="sortBy" class="filter-select" aria-label="Sort Guests By">
+                            <option value="name-asc">Sort by: Name (A-Z)</option>
+                            <option value="name-desc">Sort by: Name (Z-A)</option>
+                            <option value="table-asc">Sort by: Table (Ascending)</option>
+                            <option value="status-checked">Sort by: Checked-In First</option>
+                            <option value="status-unchecked">Sort by: Not Checked-In First</option>
+                            <option value="time-desc">Sort by: Latest Check-In</option>
+                        </select>
+                    </section>
+
+                    <section class="table-container" aria-label="Guest List Table">
+                        <table class="main-guest-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">NAME</th>
+                                    <th scope="col">NICKNAME</th>
+                                    <th scope="col">CATEGORY</th>
+                                    <th scope="col">TABLE NO.</th>
+                                    <th scope="col">STATUS</th>
+                                    <th scope="col">CHECK-IN TIME</th>
+                                    <th scope="col" class="text-center">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guestTable">
+                            </tbody>
+                        </table>
+                    </section>
+                </div>
             </div>
 
             <!-- Tables Seating Capacity View Panel -->
             <div id="mainTablesView" class="view-panel" style="display: none;">
                 <section class="dashboard-occupation-section">
-                    <div class="seating-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <!-- 1. LEFT TITLE -->
-                        <h3 style="margin: 0;">Seating Capacity Overview</h3>
+                    <div class="seating-header-container">
+                        <h3 class="seating-title">Seating Capacity Overview</h3>
 
-                        <!-- 2. SINGLE ATTENDANCE RATE CARD -->
-                        <div class="attendance-rate-card" style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05); padding: 10px 16px; border-radius: 8px;">
-                            <div class="rate-circle" style="font-weight: bold; font-size: 1.2rem; color: #10b981;">
+                        <div class="attendance-rate-card">
+                            <div class="rate-circle">
                                 <span id="overallAttendancePct">0%</span>
                             </div>
-                            <div class="rate-details" style="display: flex; flex-direction: column;">
-                                <span class="rate-label" style="font-size: 0.7rem; opacity: 0.7; letter-spacing: 0.5px;">ATTENDANCE RATE</span>
-                                <span class="rate-counts" style="font-size: 0.85rem;"><strong id="checkedInCount">0</strong> / <span id="totalGuestsCount">0</span> Checked-In</span>
+                            <div class="rate-details">
+                                <span class="rate-label">ATTENDANCE RATE</span>
+                                <span class="rate-counts"><strong id="checkedInCount">0</strong> / <span id="totalGuestsCount">0</span> Checked-In</span>
                             </div>
                         </div>
                     </div>
