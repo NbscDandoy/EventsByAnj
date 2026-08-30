@@ -1,103 +1,166 @@
+/* Import Fonts: Cinzel for Dark Mode Glow & Playfair Display for Light Mode Silk */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:wght@600;700&display=swap');
+
 /* ==========================================
    CSS CUSTOM PROPERTIES / THEME VARIABLES
    ========================================== */
 
-/* DEFAULT THEME: DARK MODE */
+/* DEFAULT THEME: LUXURY DARK MODE (DEEP MIDNIGHT & ELECTRIC GOLD) */
 :root {
-  --bg-color: #0f172a;
-  --card-bg: #1e293b;
-  --sidebar-bg: #182232;
-  --text-color: #f1f5f9;
+  --bg-color: #0b0f19;
+  --card-bg: #151c2c;
+  --sidebar-bg: #111726;
+  --text-color: #e2e8f0;
   --heading-color: #ffffff;
   --subtext-color: #94a3b8;
-  --border-color: #334155;
-  --input-border: #475569;
-  --input-bg: #0f172a;
-  --table-header-bg: #1e293b;
-  --table-checked-bg: rgba(22, 163, 74, 0.15);
-  --table-hover-bg: #273549;
-  --drop-zone-bg: #182232;
-  --drop-zone-hover-bg: #1e3a5f;
-  --drop-zone-border: #3b82f6;
-  --drop-zone-hover-border: #60a5fa;
-  --shadow-color: rgba(0, 0, 0, 0.4);
-  --modal-overlay-bg: rgba(0, 0, 0, 0.75);
-  --recent-item-bg: #334155;
-  --recent-item-hover: #475569;
+  --border-color: rgba(212, 175, 55, 0.2); /* Subtle Gold Border */
+  --input-border: #2a364f;
+  --input-bg: #0b0f19;
+  --table-header-bg: #111726;
+  --table-checked-bg: rgba(34, 197, 94, 0.12);
+  --table-hover-bg: #1e293b;
+  --drop-zone-bg: #111726;
+  --drop-zone-hover-bg: #1a233a;
+  --drop-zone-border: #d4af37;
+  --drop-zone-hover-border: #f3e5ab;
+  --shadow-color: rgba(0, 0, 0, 0.6);
+  --modal-overlay-bg: rgba(5, 7, 13, 0.85);
+  --recent-item-bg: #1e293b;
+  --recent-item-hover: #2d3d58;
 
   /* Attendance Card Theme Variables - Dark */
-  --rate-card-bg: rgba(255, 255, 255, 0.05);
-  --rate-card-border: rgba(255, 255, 255, 0.1);
-  --rate-circle-border: #3b82f6;
+  --rate-card-bg: rgba(255, 255, 255, 0.03);
+  --rate-card-border: rgba(212, 175, 55, 0.25);
+  --rate-circle-border: #d4af37;
   --rate-circle-text: #ffffff;
   --rate-details-count: #cbd5e1;
 
-  /* Brand Overrides for Dark Mode */
-  --primary-color: #3b82f6;
-  --primary-hover: #60a5fa;
-  --primary-focus-ring: rgba(59, 130, 246, 0.35);
+  /* Brand Colors - Dark Mode Glowing Gold Accents */
+  --primary-color: #d4af37;
+  --primary-hover: #f3e5ab;
+  --primary-focus-ring: rgba(212, 175, 55, 0.35);
   --success-color: #22c55e;
   --success-hover: #4ade80;
   --danger-color: #ef4444;
   --danger-hover: #f87171;
   --warning-color: #f59e0b;
   --warning-hover: #fbbf24;
-  --info-color: #06b6d4;
-  --info-hover: #22d3ee;
+  --info-color: #38bdf8;
+  --info-hover: #7dd3fc;
 
-  /* Geometry & Motion */
+  /* Geometry & Typography */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-full: 9999px;
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-serif-light: 'Playfair Display', Georgia, serif;
+  --font-serif-dark: 'Cinzel', serif;
 }
 
-/* OVERRIDE THEME: LIGHT MODE (INAYOS ANG SELECTOR MATCH) */
+/* OVERRIDE THEME: LIGHT MODE (PURE CSS SILK SATIN + CHAMPAGNE GOLD) */
 body.light-mode,
 [data-theme="light"] {
-  --bg-color: #f8fafc;
-  --card-bg: #ffffff;
-  --sidebar-bg: #ffffff;
-  --text-color: #1e293b;
-  --heading-color: #0f172a;
-  --subtext-color: #64748b;
-  --border-color: #e2e8f0;
-  --input-border: #cbd5e1;
-  --input-bg: #ffffff;
-  --table-header-bg: #f8fafc;
-  --table-checked-bg: #f0fdf4;
-  --table-hover-bg: #f1f5f9;
-  --drop-zone-bg: #f8fafc;
-  --drop-zone-hover-bg: #eff6ff;
-  --drop-zone-border: #3b82f6;
-  --drop-zone-hover-border: #1d4ed8;
-  --shadow-color: rgba(15, 23, 42, 0.08);
-  --modal-overlay-bg: rgba(15, 23, 42, 0.5);
-  --recent-item-bg: #f1f5f9;
-  --recent-item-hover: #e2e8f0;
+  /* Soft Silk Satin Mesh Gradient */
+  background-color: #f3f2ee;
+  background-image: 
+    radial-gradient(at 18% 15%, rgba(255, 255, 255, 0.95) 0px, transparent 55%),
+    radial-gradient(at 82% 20%, rgba(210, 205, 198, 0.65) 0px, transparent 50%),
+    radial-gradient(at 45% 50%, rgba(255, 255, 255, 0.8) 0px, transparent 60%),
+    radial-gradient(at 85% 85%, rgba(195, 188, 180, 0.55) 0px, transparent 50%),
+    radial-gradient(at 15% 80%, rgba(240, 236, 228, 0.9) 0px, transparent 55%),
+    linear-gradient(135deg, #f8f7f4 0%, #e2ded7 50%, #f5f3ef 100%);
+  background-attachment: fixed;
+
+  /* Glassmorphism & Light Theme Colors */
+  --bg-color: transparent;
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --sidebar-bg: rgba(255, 255, 255, 0.88);
+  --text-color: #2c3038;
+  --heading-color: #1a1a1a;
+  --subtext-color: #6d7582;
+  --border-color: rgba(212, 201, 186, 0.5);
+  --input-border: #d0c8be;
+  --input-bg: rgba(255, 255, 255, 0.92);
+  --table-header-bg: rgba(248, 246, 242, 0.9);
+  --table-checked-bg: rgba(238, 246, 240, 0.85);
+  --table-hover-bg: rgba(245, 242, 236, 0.75);
+  --drop-zone-bg: rgba(252, 250, 246, 0.7);
+  --drop-zone-hover-bg: #f5f0e6;
+  --drop-zone-border: #b8975a;
+  --drop-zone-hover-border: #8c6e33;
+  --shadow-color: rgba(45, 38, 25, 0.08);
+  --modal-overlay-bg: rgba(25, 20, 15, 0.5);
+  --recent-item-bg: rgba(246, 243, 237, 0.85);
+  --recent-item-hover: #e8e2d5;
 
   /* Attendance Card Theme Variables - Light */
-  --rate-card-bg: #f1f5f9;
-  --rate-card-border: #cbd5e1;
-  --rate-circle-border: #2563eb;
-  --rate-circle-text: #0f172a;
-  --rate-details-count: #334155;
+  --rate-card-bg: rgba(246, 243, 237, 0.85);
+  --rate-card-border: rgba(212, 201, 186, 0.8);
+  --rate-circle-border: #b8975a;
+  --rate-circle-text: #1a1a1a;
+  --rate-details-count: #333942;
 
-  /* Brand Colors - Light Mode */
-  --primary-color: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-focus-ring: rgba(37, 99, 235, 0.25);
-  --success-color: #16a34a;
-  --success-hover: #15803d;
-  --danger-color: #dc2626;
-  --danger-hover: #b91c1c;
-  --warning-color: #d97706;
-  --warning-hover: #b45309;
-  --info-color: #0891b2;
-  --info-hover: #0e7490;
+  /* Brand Colors - Light Mode Accent */
+  --primary-color: #b8975a;
+  --primary-hover: #96783d;
+  --primary-focus-ring: rgba(184, 151, 90, 0.25);
+  --success-color: #2e7d32;
+  --success-hover: #1b5e20;
+  --danger-color: #c62828;
+  --danger-hover: #b71c1c;
+  --warning-color: #d87a00;
+  --warning-hover: #b26200;
+  --info-color: #0288d1;
+  --info-hover: #01579b;
+}
+
+/* Glassmorphism Backdrop Blur for Light Mode Containers */
+body.light-mode .card-bg,
+body.light-mode .sidebar,
+body.light-mode .table-wrapper-card,
+body.light-mode .dashboard-occupation-section,
+body.light-mode .stat-card,
+body.light-mode .active-file-container {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ==========================================
+   HEADER & TITLE STYLING BY THEME
+   ========================================== */
+
+/* DARK MODE HEADERS (DEFAULT): Cinzel + Electric Gold Glow */
+.header h1,
+.seating-title,
+.modal-header h2,
+.sidebar-header h2 {
+  font-family: var(--font-serif-dark);
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #ffffff 20%, #ffe259 70%, #ffa751 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
+}
+
+.sidebar-header h2 {
+  text-transform: uppercase;
+  font-size: 1.25rem;
+}
+
+/* LIGHT MODE HEADERS: Playfair Display + Deep Silk Gold Gradient */
+body.light-mode .header h1,
+body.light-mode .seating-title,
+body.light-mode .modal-header h2,
+body.light-mode .sidebar-header h2 {
+  font-family: var(--font-serif-light);
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, #1a1a1a 0%, #63502d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 
 /* ==========================================
@@ -162,7 +225,6 @@ body {
   gap: 12px;
 }
 
-/* BRAND LOGO STYLING */
 .sidebar-brand-logo {
   width: 100%;
   max-width: 160px;
@@ -181,17 +243,6 @@ body {
 
 .sidebar-header .brand-icon {
   font-size: 1.5rem;
-  color: var(--primary-color);
-}
-
-.sidebar-header h2 {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--heading-color);
-  transition: color var(--transition-fast);
-}
-
-.sidebar-header:hover h2 {
   color: var(--primary-color);
 }
 
@@ -246,7 +297,8 @@ body {
 
 .sidebar-nav-btn.active {
   background-color: var(--primary-color);
-  color: #ffffff;
+  color: #111726;
+  font-weight: 700;
   border-color: var(--primary-color);
 }
 
@@ -348,6 +400,25 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-delete-file {
+  background: transparent;
+  border: none;
+  color: var(--subtext-color);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.btn-delete-file:hover {
+  color: var(--danger-color);
+  background-color: rgba(239, 68, 68, 0.1);
 }
 
 .empty-state {
@@ -362,6 +433,10 @@ body {
   margin-top: auto;
   padding-top: 15px;
   border-top: 1px solid var(--border-color);
+}
+
+#sidebarQrSection.hidden {
+  display: none !important;
 }
 
 .sidebar-qr-container {
@@ -413,7 +488,6 @@ body {
 .header h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--heading-color);
 }
 
 /* Active File Section */
@@ -424,8 +498,10 @@ body {
 .active-file-container {
   display: flex;
   flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   background: var(--card-bg);
   padding: 12px 18px;
   border-radius: var(--radius-md);
@@ -439,7 +515,8 @@ body {
   align-items: center;
   gap: 8px;
   background-color: var(--primary-color);
-  color: #ffffff;
+  color: #111726;
+  font-weight: 600;
   padding: 6px 12px;
   border-radius: var(--radius-full);
   font-size: 0.85rem;
@@ -450,7 +527,7 @@ body {
 .btn-remove-chip {
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: #111726;
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -522,7 +599,7 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: rgba(37, 99, 235, 0.1);
+  background-color: rgba(212, 175, 55, 0.12);
   color: var(--primary-color);
   display: flex;
   align-items: center;
@@ -535,7 +612,7 @@ body {
 }
 
 .stat-card.checked-in .stat-icon {
-  background-color: rgba(22, 163, 74, 0.1);
+  background-color: rgba(34, 197, 94, 0.12);
   color: var(--success-color);
 }
 
@@ -544,7 +621,7 @@ body {
 }
 
 .stat-card.not-checked .stat-icon {
-  background-color: rgba(220, 38, 38, 0.1);
+  background-color: rgba(239, 68, 68, 0.12);
   color: var(--danger-color);
 }
 
@@ -661,7 +738,8 @@ body {
 
 .btn-primary {
   background-color: var(--primary-color);
-  color: #ffffff;
+  color: #111726;
+  font-weight: 700;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -707,10 +785,11 @@ body {
   background-color: var(--recent-item-hover);
 }
 
-/* Action Button Variants */
+/* Action Buttons inside Tables */
 .btn-checkin {
   background-color: var(--primary-color);
-  color: #ffffff;
+  color: #111726;
+  font-weight: 700;
   padding: 6px 12px;
   font-size: 0.82rem;
   border-radius: var(--radius-sm);
@@ -776,7 +855,7 @@ body {
 }
 
 /* ==========================================
-   PULLING LIGHT SWITCH INTERACTION (INAYOS)
+   PULLING LIGHT SWITCH INTERACTION
    ========================================== */
 .pull-switch-wrapper {
   position: relative;
@@ -840,16 +919,11 @@ body {
   stroke-linejoin: round;
 }
 
-
-/* ------------------------------------------
-   1. DEFAULT / DARK MODE STATE (UNCHECKED)
-   - Background ng switch: PUTI
-   - Icon: ARAW (SUN) na dark para kapans-pansin
-   ------------------------------------------ */
+/* Dark Mode State (Unchecked) */
 .pull-switch-checkbox:not(:checked) + .pull-switch-label .pull-handle {
   background-color: #ffffff;
   border: 2px solid #ffffff;
-  color: #0f172a; /* Kulay ng Sun Icon */
+  color: #0b0f19;
 }
 
 .pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-sun {
@@ -860,16 +934,11 @@ body {
   display: none;
 }
 
-
-/* ------------------------------------------
-   2. LIGHT MODE STATE (CHECKED)
-   - Background ng switch: ITIM
-   - Icon: BUWAN (MOON) na PUTI
-   ------------------------------------------ */
+/* Light Mode State (Checked) */
 .pull-switch-checkbox:checked + .pull-switch-label .pull-handle {
-  background-color: #0f172a;
-  border: 2px solid #0f172a;
-  color: #ffffff; /* Kulay ng Moon Icon */
+  background-color: #0b0f19;
+  border: 2px solid #0b0f19;
+  color: #ffffff;
 }
 
 .pull-switch-checkbox:checked + .pull-switch-label .icon-sun {
@@ -896,10 +965,8 @@ body {
 .seating-title {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--heading-color);
 }
 
-/* Seating Header Container */
 .seating-header-container {
   display: flex;
   justify-content: space-between;
@@ -909,7 +976,6 @@ body {
   flex-wrap: wrap;
 }
 
-/* Attendance Rate Widget Card */
 .attendance-rate-card {
   display: flex;
   align-items: center;
@@ -1084,35 +1150,25 @@ body {
 }
 
 .badge-vip {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: rgba(212, 175, 55, 0.2);
+  color: #ffe259;
+  border: 1px solid rgba(212, 175, 55, 0.4);
 }
 
-body.dark-mode .badge-vip,
-[data-theme="dark"] .badge-vip {
-  background-color: #78350f;
-  color: #fde68a;
+body.light-mode .badge-vip {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: none;
 }
 
 .badge-guest {
-  background-color: #f3f4f6;
-  color: #374151;
-}
-
-body.dark-mode .badge-guest,
-[data-theme="dark"] .badge-guest {
-  background-color: #374151;
+  background-color: #1e293b;
   color: #f3f4f6;
 }
 
-.badge-warning {
-  background-color: #fef3c7;
-  color: #b45309;
-}
-
-.badge-info {
-  background-color: #e0f2fe;
-  color: #0369a1;
+body.light-mode .badge-guest {
+  background-color: #f3f4f6;
+  color: #374151;
 }
 
 .status-checked {
@@ -1161,7 +1217,7 @@ body.dark-mode .badge-guest,
   max-width: 520px;
   padding: 24px;
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
   border: 1px solid var(--border-color);
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
@@ -1176,7 +1232,6 @@ body.dark-mode .badge-guest,
 .modal-header h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--heading-color);
 }
 
 .modal-close {
