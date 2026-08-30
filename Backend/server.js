@@ -19,6 +19,19 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 /* ==========================================
+   HELPER FOR PHILIPPINE STANDARD TIME (PST)
+   ========================================== */
+function getPhilippineTime() {
+    return new Date().toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Manila',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+}
+
+/* ==========================================
    MULTER CONFIGURATION (MEMORY STORAGE FOR RELIABILITY)
    ========================================== */
 // Standard memory storage (works seamlessly on Render/Heroku and local disk)
@@ -161,7 +174,7 @@ function clearGuestsTable() {
     }
 }
 
-// INAYOS: Synchronous Transaction at hiwalay na Async QR Code Generation
+// Synchronous Transaction at hiwalay na Async QR Code Generation
 async function bulkInsertGuests(guests) {
     if (!guests || guests.length === 0) return;
 
@@ -253,11 +266,8 @@ async function processQrScanCheckIn(qrPayload) {
         throw new Error('Invalid QR Payload format.');
     }
 
-    const checkInTimeStr = new Date().toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit' 
-    });
+    // Inayos: Philippine Standard Time (PST)
+    const checkInTimeStr = getPhilippineTime();
 
     let guest = null;
 
@@ -301,11 +311,8 @@ async function processQrScanCheckIn(qrPayload) {
    ========================================== */
 io.on('connection', (socket) => {
     socket.on('checkIn', ({ id }) => {
-        const checkInTimeStr = new Date().toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit' 
-        });
+        // Inayos: Philippine Standard Time (PST)
+        const checkInTimeStr = getPhilippineTime();
 
         try {
             const res = db.prepare(`UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`).run(checkInTimeStr, id);
@@ -419,9 +426,8 @@ app.post('/api/guests/batch-checkin', (req, res) => {
     }
 
     const isCheckIn = status !== 'Not Checked-In';
-    const checkInTimeStr = isCheckIn 
-        ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
-        : null;
+    // Inayos: Philippine Standard Time (PST)
+    const checkInTimeStr = isCheckIn ? getPhilippineTime() : null;
 
     const placeholders = ids.map(() => '?').join(',');
     const sql = `UPDATE guests SET status = ?, check_in_time = ? WHERE id IN (${placeholders})`;
@@ -622,7 +628,7 @@ app.delete('/api/guests/:id', (req, res) => {
 });
 
 /* ==========================================
-   INAYOS: CLEANER /API/IMPORT ENDPOINT
+   CLEANER /API/IMPORT ENDPOINT
    ========================================== */
 app.post('/api/import', upload.single('file'), async (req, res) => {
     if (!req.file) {
