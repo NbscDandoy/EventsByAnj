@@ -823,24 +823,33 @@ body {
 
 .icon-sun { 
   color: #f59e0b; 
-  display: none; 
 }
 
 .icon-moon { 
   color: var(--text-color); 
+}
+
+/* ==========================================
+   CORRECTED TOGGLE LOGIC (NO BODY CONFLICTS)
+   ========================================== */
+
+/* KAPAG NAKA-CHECK (LIGHT MODE) */
+.pull-switch-checkbox:checked + .pull-switch-label .icon-sun { 
   display: block; 
 }
 
-.pull-switch-checkbox:checked + .pull-switch-label .icon-sun,
-body.dark-theme .icon-sun { 
-  display: block; 
-}
-
-.pull-switch-checkbox:checked + .pull-switch-label .icon-moon,
-body.dark-theme .icon-moon { 
+.pull-switch-checkbox:checked + .pull-switch-label .icon-moon { 
   display: none; 
 }
 
+/* KAPAG HINDI NAKA-CHECK (DARK MODE) */
+.pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-sun { 
+  display: none; 
+}
+
+.pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-moon { 
+  display: block; 
+}
 /* ==========================================
    OCCUPATION GRIDS & CARDS
    ========================================== */
