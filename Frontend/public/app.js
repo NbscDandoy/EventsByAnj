@@ -77,9 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupGlobalControls();
     setupEventDelegation();
 
-    // Kapag binuksan ang URL mula sa QR Code scan (may #seating sa dulo)
+    // Default: Sa Dashboard View papasok ang Admin/Owner kung walang #seating hash
     if (window.location.hash === '#seating') {
         switchTab('tables');
+    } else {
+        switchTab('dashboard');
     }
 });
 
@@ -87,6 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('hashchange', () => {
     if (window.location.hash === '#seating') {
         switchTab('tables');
+    } else {
+        switchTab('dashboard');
     }
 });
 
@@ -185,22 +189,14 @@ function switchTab(tab) {
         if (btnNavTables) btnNavTables.classList.add('active');
         if (mainTitle) mainTitle.textContent = 'Seating Capacity Overview';
 
-        // Tignan kung bisita/guest view mode (#seating hash)
-        const isGuestView = window.location.hash === '#seating';
-
-        if (sidebarQrSection) {
-            if (isGuestView) {
-                sidebarQrSection.classList.add('hidden');
-            } else {
-                sidebarQrSection.classList.remove('hidden');
-            }
-        }
+        // Pakita ang Sidebar QR code sa seating tab
+        if (sidebarQrSection) sidebarQrSection.classList.remove('hidden');
 
         // I-fetch ang seating data
         loadTableOccupation();
 
-        // I-generate lang ang QR code kung HINDI guest view mode
-        if (!isGuestView && typeof generateSeatingQRCode === 'function') {
+        // I-generate ang QR code
+        if (typeof generateSeatingQRCode === 'function') {
             generateSeatingQRCode();
         }
     }
