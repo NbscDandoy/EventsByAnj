@@ -19,29 +19,12 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 /* ==========================================
-   MULTER CONFIGURATION (HYBRID DISK / MEMORY)
+   MULTER CONFIGURATION (MEMORY STORAGE FOR RELIABILITY)
    ========================================== */
-// Standard disk storage for persistent uploaded physical files
-const diskStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        const baseName = path.basename(file.originalname, ext);
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e4);
-        cb(null, `${baseName}-${uniqueSuffix}${ext}`);
-    }
-});
-
-// Primary file upload handler (supports disk + memory buffer backup for cloud platforms like Render)
+// Standard memory storage (works seamlessly on Render/Heroku and local disk)
 const upload = multer({ 
-    storage: diskStorage,
-    limits: { fileSize: 15 * 1024 * 1024 } // 15MB Limit
-});
-
-// Memory storage instance specifically for direct file stream imports
-const memoryUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 15 * 1024 * 1024 }
+    limits: { fileSize: 15 * 1024 * 1024 } // 15MB Limit
 });
 
 app.use(express.json());
@@ -49,7 +32,6 @@ app.use(express.json());
 /* ==========================================
    RESPONSIVE DYNAMIC STATIC FILE SERVING
    ========================================== */
-// Auto-detect public folder location across different deployment setups
 const possiblePublicPaths = [
     path.join(__dirname, '..', 'Frontend', 'public'),
     path.join(__dirname, 'public'),
@@ -65,7 +47,7 @@ app.use(express.static(publicPath));
 const dbPath = path.join(__dirname, 'events.db');
 const db = new Database(dbPath);
 
-// Enable Write-Ahead Logging (WAL) for faster execution & concurrent reads/writes
+// Enable Write-Ahead Logging (WAL)
 db.pragma('journal_mode = WAL');
 
 db.exec(`
@@ -125,12 +107,11 @@ async function generateQrCodeDataUrl(payloadObj) {
     }
 }
 
-// Flexible Excel Parser that supports both File Paths and RAM Buffers
 function parseAndInsertExcel(fileInput) {
     let workbook;
     if (Buffer.isBuffer(fileInput)) {
         workbook = XLSX.read(fileInput, { type: 'buffer' });
-    } else if (typeof fileInput === 'string') {
+    } else if (typeof fileInput === 'string' && fs.existsSync(fileInput)) {
         workbook = XLSX.readFile(fileInput);
     } else {
         throw new Error('Invalid file payload provided.');
@@ -176,10 +157,11 @@ function clearGuestsTable() {
     try {
         db.prepare("DELETE FROM sqlite_sequence WHERE name='guests'").run();
     } catch (err) {
-        // Safe to ignore if sqlite_sequence table does not exist
+        // Safe to ignore
     }
 }
 
+// INAYOS: Synchronous Transaction at hiwalay na Async QR Code Generation
 async function bulkInsertGuests(guests) {
     if (!guests || guests.length === 0) return;
 
@@ -190,16 +172,22 @@ async function bulkInsertGuests(guests) {
         `UPDATE guests SET qr_code = ? WHERE id = ?`
     );
 
-    const insertTransaction = db.transaction(async (guestList) => {
-        for (const g of guestList) {
+    // Step 1: Synchronous Bulk Insert
+    const insertedRecords = [];
+    const runTransaction = db.transaction((list) => {
+        for (const g of list) {
             const res = insertStmt.run(g.name, g.nickname, g.category, g.seat_plan, null);
-            const insertedId = res.lastInsertRowid;
-            const qrDataUrl = await generateQrCodeDataUrl({ id: insertedId, name: g.name, table: g.seat_plan });
-            updateQrStmt.run(qrDataUrl, insertedId);
+            insertedRecords.push({ id: res.lastInsertRowid, name: g.name, table: g.seat_plan });
         }
     });
 
-    await insertTransaction(guests);
+    runTransaction(guests);
+
+    // Step 2: Async QR Code generation & update
+    for (const record of insertedRecords) {
+        const qrDataUrl = await generateQrCodeDataUrl({ id: record.id, name: record.name, table: record.table });
+        updateQrStmt.run(qrDataUrl, record.id);
+    }
 }
 
 function notifyTableOccupationChange() {
@@ -309,7 +297,7 @@ async function processQrScanCheckIn(qrPayload) {
 }
 
 /* ==========================================
-   SOCKET.IO REAL-TIME CHECK-IN LISTENERS
+   SOCKET.IO REAL-TIME LISTENERS
    ========================================== */
 io.on('connection', (socket) => {
     socket.on('checkIn', ({ id }) => {
@@ -634,40 +622,30 @@ app.delete('/api/guests/:id', (req, res) => {
 });
 
 /* ==========================================
-   UPDATED /API/IMPORT ENDPOINT (DYNAMIC DISK/MEMORY)
+   INAYOS: CLEANER /API/IMPORT ENDPOINT
    ========================================== */
-app.post('/api/import', (req, res) => {
-    // Dynamically fallback to memory upload if disk-write fails or is restricted on Render
-    upload.single('file')(req, res, async (err) => {
-        if (err || !req.file) {
-            // Memory storage retry logic
-            return memoryUpload.single('file')(req, res, async (memErr) => {
-                if (memErr || !req.file) {
-                    return res.status(400).json({ error: 'File upload failed. Please send a valid Excel (.xlsx) file.' });
-                }
-                await processImportFile(req, res);
-            });
-        }
-        await processImportFile(req, res);
-    });
-});
+app.post('/api/import', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'File upload failed. Please send a valid Excel (.xlsx) file.' });
+    }
 
-async function processImportFile(req, res) {
     try {
-        // Read either buffer memory or file path based on upload type
-        const fileData = req.file.buffer ? req.file.buffer : req.file.path;
-        const importedGuests = parseAndInsertExcel(fileData);
+        // Read directly from memory buffer
+        const importedGuests = parseAndInsertExcel(req.file.buffer);
 
         if (importedGuests.length === 0) {
-            if (req.file.path) safeUnlink(req.file.path);
             return res.status(400).json({ error: 'No valid guests found in the file.' });
         }
 
         clearGuestsTable();
         await bulkInsertGuests(importedGuests);
 
-        // Clean up temporary disk file if applicable
-        if (req.file.path) safeUnlink(req.file.path);
+        // Optionally save a copy to uploads dir for recent files history
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e4);
+        const ext = path.extname(req.file.originalname) || '.xlsx';
+        const baseName = path.basename(req.file.originalname, ext);
+        const savePath = path.join(uploadDir, `${baseName}-${uniqueSuffix}${ext}`);
+        fs.writeFileSync(savePath, req.file.buffer);
 
         triggerRealtimeUpdates();
         res.json({ 
@@ -677,10 +655,9 @@ async function processImportFile(req, res) {
         });
     } catch (error) {
         console.error('Import Processing Error:', error);
-        if (req.file && req.file.path) safeUnlink(req.file.path);
         res.status(500).json({ error: 'Failed to process Excel file. Please verify file formatting.' });
     }
-}
+});
 
 app.get('/api/export', (req, res) => {
     const format = (req.query.format || 'excel').toLowerCase();
