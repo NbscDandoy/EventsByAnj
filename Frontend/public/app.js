@@ -266,15 +266,25 @@ function setupDragAndDrop() {
     });
 }
 
+function showLoadingSpinner(show) {
+    const spinner = document.getElementById('loadingSpinner') || document.getElementById('spinner');
+    if (spinner) {
+        if (show) spinner.classList.remove('hidden');
+        else spinner.classList.add('hidden');
+    }
+}
+
 async function processSelectedFiles(files) {
     try {
         showLoadingSpinner(true);
 
-        const uploadResult = await uploadExcelFiles(files);
+        // Fast parallel upload ng selected files
+        await uploadExcelFiles(files);
 
+        // Parallel update para sa recent file list at UI render
         await Promise.all([
             fetchRecentFiles(),
-            renderUpdatedDashboard() 
+            loadGuests()
         ]);
     } catch (error) {
         console.error("Error processing files:", error);
@@ -383,8 +393,10 @@ async function selectAndLoadFile(fileName) {
     } catch (err) {
         console.error('Error connecting to backend during file switch:', err);
     } finally {
-        await loadGuests();
-        await fetchRecentFiles();
+        await Promise.all([
+            loadGuests(),
+            fetchRecentFiles()
+        ]);
     }
 }
 
@@ -424,14 +436,18 @@ async function removeRecentFile(e, fileName) {
             } else {
                 // KUNG WALA NANG NATIRANG FILE, LINISIN ANG STATE
                 saveStateToLocalStorage();
-                await fetchRecentFiles();
-                await loadGuests();
+                await Promise.all([
+                    fetchRecentFiles(),
+                    loadGuests()
+                ]);
             }
         } else {
             // Kung hindi naman active file ang binura, simpleng refresh lang ng state
             saveStateToLocalStorage();
-            await fetchRecentFiles();
-            await loadGuests();
+            await Promise.all([
+                fetchRecentFiles(),
+                loadGuests()
+            ]);
         }
     }
 }
@@ -491,10 +507,12 @@ function clearSelectedChip(event, fileName) {
     removeRecentFile(null, fileName);
 }
 
+// FAST ASYNC/PARALLEL FILE UPLOAD METHOD
 async function uploadExcelFiles(files) {
     let successCount = 0;
 
-    for (const file of files) {
+    // Isabay-sabay ang pag-upload ng mga file gamit ang Promise.all
+    const uploadPromises = Array.from(files).map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);
 
@@ -508,15 +526,20 @@ async function uploadExcelFiles(files) {
                         loadedFiles.push(data.activeFile);
                     }
                 }
-                successCount++;
+                return true;
             } else {
                 const errData = await res.json().catch(() => ({}));
                 console.error(`Failed to process ${file.name}:`, errData.error);
+                return false;
             }
         } catch (err) {
             console.error(`Error uploading ${file.name}:`, err);
+            return false;
         }
-    }
+    });
+
+    const results = await Promise.all(uploadPromises);
+    successCount = results.filter(res => res === true).length;
 
     const fileInput = document.getElementById('excelFile') || document.getElementById('fileInput');
     if (fileInput) fileInput.value = '';
@@ -707,11 +730,10 @@ function sortTablesList(tables) {
         const nameA = String(a.table_name || a.seat_plan || a || '').trim();
         const nameB = String(b.table_name || b.seat_plan || b || '').trim();
 
-        // Kunin ang priority category
         const getPriority = (name) => {
-            if (name.toLowerCase() === 'unassigned') return 3; // Huli
-            if (name.toUpperCase().startsWith('VIP')) return 1; // Una
-            return 2; // Regular tables
+            if (name.toLowerCase() === 'unassigned') return 3;
+            if (name.toUpperCase().startsWith('VIP')) return 1;
+            return 2;
         };
 
         const priorityA = getPriority(nameA);
@@ -721,7 +743,6 @@ function sortTablesList(tables) {
             return priorityA - priorityB;
         }
 
-        // Kunin ang numero para sa tamang sequential order (1, 2, 3...)
         const numA = parseInt(nameA.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(nameB.replace(/\D/g, ''), 10) || 0;
 
@@ -733,7 +754,6 @@ function renderTableOccupation(tables) {
     const standaloneContainer = document.getElementById('standaloneOccupationGrid');
     const mainGridContainer = document.getElementById('mainOccupationGrid');
 
-    // Handle Empty State
     if (!tables || tables.length === 0) {
         const emptyHTML = `<p class="empty-state">No table assignments found.</p>`;
         if (standaloneContainer) standaloneContainer.innerHTML = emptyHTML;
@@ -741,10 +761,8 @@ function renderTableOccupation(tables) {
         return;
     }
 
-    // Pagsunod-sunorin ang mga mesa: VIP 1-4 -> Regular Tables 1-N -> Unassigned
     const sortedTables = sortTablesList(tables);
 
-    // Isang beses lang i-generate ang HTML cards para sa dalawang containers
     const cardsHTML = sortedTables.map(tbl => {
         const tableName = tbl.table_name || 'Unassigned';
         const total = tbl.total_guests || 0;
@@ -769,7 +787,6 @@ function renderTableOccupation(tables) {
         `;
     }).join('');
 
-    // Safe DOM injection
     if (standaloneContainer) standaloneContainer.innerHTML = cardsHTML;
     if (mainGridContainer) mainGridContainer.innerHTML = cardsHTML;
 }
@@ -835,7 +852,6 @@ function populateTableDropdown() {
     const currentSelection = tableSelect.value;
     const uniqueTables = [...new Set(guests.map(g => g.seat_plan))].filter(Boolean);
 
-    // Sundin din ang VIP 1-4 -> Regular 1-N -> Unassigned sorting
     const sortedTables = sortTablesList(uniqueTables);
 
     tableSelect.innerHTML = '<option value="">All Tables</option>';
@@ -864,7 +880,6 @@ function applyFilters() {
         return matchesSearch && matchesCategory && matchesTable;
     });
 
-    // Apply Dynamic Sorting Logic
     filtered.sort((a, b) => {
         const nameA = (a.name || '').trim();
         const nameB = (b.name || '').trim();
