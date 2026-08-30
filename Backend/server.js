@@ -1,0 +1,801 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const sqlite3 = require('sqlite3').verbose();
+const multer = require('multer');
+const XLSX = require('xlsx');
+const path = require('path');
+const fs = require('fs');
+const QRCode = require('qrcode');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Preserve file identities with unique timestamps to prevent collisions
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const baseName = path.basename(file.originalname, ext);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e4);
+        cb(null, `${baseName}-${uniqueSuffix}${ext}`);
+    }
+});
+
+const upload = multer({ 
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+app.use(express.json());
+// Serves frontend styles and assets
+app.use(express.static(path.join(__dirname, '..', 'Frontend', 'public')));
+
+const dbPath = path.join(__dirname, 'events.db');
+const db = new sqlite3.Database(dbPath);
+
+/* ==========================================
+   SQLITE PROMISIFIED HELPER WRAPPERS
+   ========================================== */
+const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+        if (err) return reject(err);
+        resolve(this);
+    });
+});
+
+const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+    });
+});
+
+const dbAll = (sql, params = []) => new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+    });
+});
+
+// Initialize DB schema safely
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS guests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        nickname TEXT,
+        category TEXT,
+        seat_plan TEXT,
+        status TEXT DEFAULT 'Not Checked-In',
+        check_in_time TEXT,
+        qr_code TEXT
+    )`, (err) => {
+        if (err) {
+            console.error('Error creating guests table:', err.message);
+            return;
+        }
+
+        db.all(`PRAGMA table_info(guests)`, (err, columns) => {
+            if (err) {
+                console.error('Error reading schema info:', err.message);
+                return;
+            }
+            const hasQrCode = columns && columns.some(col => col.name === 'qr_code');
+            if (!hasQrCode) {
+                db.run(`ALTER TABLE guests ADD COLUMN qr_code TEXT`, (alterErr) => {
+                    if (alterErr) console.error('Error adding qr_code column:', alterErr.message);
+                });
+            }
+        });
+    });
+});
+
+/* ==========================================
+   HELPER FUNCTIONS & REAL-TIME EMITTERS
+   ========================================== */
+function safeUnlink(filePath) {
+    if (filePath && fs.existsSync(filePath)) {
+        try {
+            fs.unlinkSync(filePath);
+        } catch (err) {
+            console.error(`Failed to delete file ${filePath}:`, err.message);
+        }
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function isPathInsideDir(targetPath, parentDir) {
+    const relative = path.relative(parentDir, targetPath);
+    return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+async function generateQrCodeDataUrl(payloadObj) {
+    try {
+        return await QRCode.toDataURL(JSON.stringify(payloadObj));
+    } catch (err) {
+        console.error('Error generating QR Code:', err);
+        return null;
+    }
+}
+
+function parseAndInsertExcel(filePath) {
+    const workbook = XLSX.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    const importedGuests = [];
+
+    rawRows.forEach(row => {
+        const keys = Object.keys(row);
+        const nameKey = keys.find(k => k.toLowerCase().includes('name (surname') || k.toLowerCase().includes('name') || k.toLowerCase().includes('guest'));
+        const nicknameKey = keys.find(k => k.toLowerCase().includes('name tag') || k.toLowerCase().includes('nickname') || k.toLowerCase().includes('alias'));
+        const tableKey = keys.find(k => k.toLowerCase().includes('table no') || k.toLowerCase().includes('table') || k.toLowerCase().includes('seat'));
+        const vipKey = keys.find(k => k.toLowerCase().includes('vip') || k.toLowerCase().includes('category'));
+
+        const guestName = row[nameKey] ? String(row[nameKey]).trim() : '';
+        if (!guestName || guestName.toLowerCase().includes('total')) return;
+
+        const nickname = row[nicknameKey] ? String(row[nicknameKey]).trim() : '';
+        const rawTable = row[tableKey] ? String(row[tableKey]).trim() : 'Unassigned';
+        
+        const isVipMarked = row[vipKey] && (String(row[vipKey]) === '1' || String(row[vipKey]).toLowerCase() === 'true' || String(row[vipKey]).toLowerCase() === 'vip');
+        const isVipTable = rawTable.toUpperCase().includes('VIP');
+
+        const category = (isVipMarked || isVipTable) ? 'VIP' : 'Guest';
+
+        importedGuests.push({
+            name: guestName,
+            nickname: nickname,
+            category: category,
+            seat_plan: rawTable
+        });
+    });
+
+    return importedGuests;
+}
+
+async function clearGuestsTable() {
+    await dbRun('DELETE FROM guests');
+    try {
+        await dbRun("DELETE FROM sqlite_sequence WHERE name='guests'");
+    } catch (err) {
+        // Safe to ignore if sqlite_sequence table does not exist yet
+    }
+}
+
+async function bulkInsertGuests(guests) {
+    if (!guests || guests.length === 0) return;
+
+    await dbRun('BEGIN TRANSACTION');
+    try {
+        for (const g of guests) {
+            const insertResult = await dbRun(
+                `INSERT INTO guests (name, nickname, category, seat_plan, qr_code) VALUES (?, ?, ?, ?, ?)`,
+                [g.name, g.nickname, g.category, g.seat_plan, null]
+            );
+
+            const insertedId = insertResult.lastID;
+            const qrDataUrl = await generateQrCodeDataUrl({ id: insertedId, name: g.name, table: g.seat_plan });
+
+            await dbRun(
+                `UPDATE guests SET qr_code = ? WHERE id = ?`,
+                [qrDataUrl, insertedId]
+            );
+        }
+        await dbRun('COMMIT');
+    } catch (err) {
+        await dbRun('ROLLBACK');
+        throw err;
+    }
+}
+
+async function notifyTableOccupationChange() {
+    const query = `
+        SELECT 
+            seat_plan AS table_name,
+            COUNT(*) AS total_guests,
+            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in_count
+        FROM guests
+        GROUP BY seat_plan
+        ORDER BY seat_plan ASC
+    `;
+    try {
+        const rows = await dbAll(query);
+        io.emit('tableOccupationUpdated', { tables: rows });
+    } catch (err) {
+        console.error('Error in notifyTableOccupationChange:', err.message);
+    }
+}
+
+async function notifyDashboardMetricsChange() {
+    const query = `
+        SELECT 
+            COUNT(*) AS total_guests,
+            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in,
+            SUM(CASE WHEN status = 'Not Checked-In' OR status IS NULL THEN 1 ELSE 0 END) AS not_checked_in,
+            SUM(CASE WHEN category = 'VIP' THEN 1 ELSE 0 END) AS vip_count
+        FROM guests
+    `;
+    try {
+        const row = await dbGet(query);
+        io.emit('dashboardMetricsUpdated', {
+            total_guests: row ? row.total_guests || 0 : 0,
+            checked_in: row ? row.checked_in || 0 : 0,
+            not_checked_in: row ? row.not_checked_in || 0 : 0,
+            vip_count: row ? row.vip_count || 0 : 0
+        });
+    } catch (err) {
+        console.error('Error in notifyDashboardMetricsChange:', err.message);
+    }
+}
+
+function triggerRealtimeUpdates() {
+    io.emit('guestListReload');
+    notifyTableOccupationChange();
+    notifyDashboardMetricsChange();
+}
+
+async function processQrScanCheckIn(qrPayload) {
+    let parsedData = null;
+    
+    if (typeof qrPayload === 'string') {
+        try {
+            parsedData = JSON.parse(qrPayload);
+        } catch (e) {
+            parsedData = { raw: qrPayload };
+        }
+    } else if (typeof qrPayload === 'object' && qrPayload !== null) {
+        parsedData = qrPayload;
+    }
+
+    if (!parsedData) {
+        throw new Error('Invalid QR Payload format.');
+    }
+
+    const checkInTimeStr = new Date().toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+    });
+
+    let findQuery = '';
+    let queryParams = [];
+
+    if (parsedData.id) {
+        findQuery = 'SELECT * FROM guests WHERE id = ?';
+        queryParams = [parsedData.id];
+    } else if (parsedData.name) {
+        findQuery = 'SELECT * FROM guests WHERE LOWER(name) = LOWER(?)';
+        queryParams = [parsedData.name.trim()];
+    } else if (parsedData.raw) {
+        findQuery = 'SELECT * FROM guests WHERE id = ? OR LOWER(name) = LOWER(?)';
+        queryParams = [parsedData.raw, parsedData.raw.trim()];
+    } else {
+        throw new Error('QR Code contains missing guest information.');
+    }
+
+    const guest = await dbGet(findQuery, queryParams);
+    if (!guest) throw new Error('Guest not found in database.');
+
+    if (guest.status === 'Checked-In') {
+        return {
+            alreadyCheckedIn: true,
+            message: `${guest.name} is ALREADY checked in!`,
+            guest
+        };
+    }
+
+    await dbRun(
+        `UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`,
+        [checkInTimeStr, guest.id]
+    );
+
+    const updatedGuest = { ...guest, status: 'Checked-In', check_in_time: checkInTimeStr };
+    
+    io.emit('guestUpdated', { id: guest.id, status: 'Checked-In', check_in_time: checkInTimeStr });
+    notifyTableOccupationChange();
+    notifyDashboardMetricsChange();
+
+    return {
+        success: true,
+        message: `Successfully checked-in ${guest.name}!`,
+        guest: updatedGuest
+    };
+}
+
+/* ==========================================
+   SOCKET.IO REAL-TIME CHECK-IN LOGIC
+   ========================================== */
+io.on('connection', (socket) => {
+    socket.on('checkIn', async ({ id }) => {
+        const checkInTimeStr = new Date().toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
+
+        try {
+            const res = await dbRun(
+                `UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`,
+                [checkInTimeStr, id]
+            );
+            if (res.changes > 0) {
+                io.emit('guestUpdated', { id, status: 'Checked-In', check_in_time: checkInTimeStr });
+                notifyTableOccupationChange();
+                notifyDashboardMetricsChange();
+            }
+        } catch (err) {
+            console.error('Socket checkIn error:', err.message);
+        }
+    });
+
+    socket.on('uncheckIn', async ({ id }) => {
+        try {
+            const res = await dbRun(
+                `UPDATE guests SET status = 'Not Checked-In', check_in_time = NULL WHERE id = ?`,
+                [id]
+            );
+            if (res.changes > 0) {
+                io.emit('guestUpdated', { id, status: 'Not Checked-In', check_in_time: null });
+                notifyTableOccupationChange();
+                notifyDashboardMetricsChange();
+            }
+        } catch (err) {
+            console.error('Socket uncheckIn error:', err.message);
+        }
+    });
+
+    socket.on('scanCheckIn', async (data, ackCallback) => {
+        const qrPayload = data?.payload || data;
+        try {
+            const result = await processQrScanCheckIn(qrPayload);
+            if (typeof ackCallback === 'function') {
+                ackCallback(result);
+            } else {
+                socket.emit('scanCheckInResult', result);
+            }
+        } catch (err) {
+            const errResp = { success: false, error: err.message };
+            if (typeof ackCallback === 'function') {
+                ackCallback(errResp);
+            } else {
+                socket.emit('scanCheckInResult', errResp);
+            }
+        }
+    });
+});
+
+/* ==========================================
+   REST API ENDPOINTS
+   ========================================== */
+
+app.get('/api/dashboard-summary', async (req, res) => {
+    const query = `
+        SELECT 
+            COUNT(*) AS total_guests,
+            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in,
+            SUM(CASE WHEN status = 'Not Checked-In' OR status IS NULL THEN 1 ELSE 0 END) AS not_checked_in,
+            SUM(CASE WHEN category = 'VIP' THEN 1 ELSE 0 END) AS vip_count
+        FROM guests
+    `;
+    try {
+        const row = await dbGet(query);
+        res.json({
+            total_guests: row ? row.total_guests || 0 : 0,
+            checked_in: row ? row.checked_in || 0 : 0,
+            not_checked_in: row ? row.not_checked_in || 0 : 0,
+            vip_count: row ? row.vip_count || 0 : 0
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/guests', async (req, res) => {
+    try {
+        const rows = await dbAll('SELECT * FROM guests ORDER BY name ASC');
+        res.json({ guests: rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/guests', async (req, res) => {
+    const { name, nickname, category, seat_plan } = req.body;
+    if (!name) {
+        return res.status(400).json({ error: 'Name is required.' });
+    }
+
+    const guestCategory = category || 'Guest';
+    const guestSeat = seat_plan || 'Unassigned';
+
+    try {
+        const result = await dbRun(
+            `INSERT INTO guests (name, nickname, category, seat_plan) VALUES (?, ?, ?, ?)`,
+            [name, nickname || '', guestCategory, guestSeat]
+        );
+
+        const newId = result.lastID;
+        const qrDataUrl = await generateQrCodeDataUrl({ id: newId, name, table: guestSeat });
+
+        await dbRun(`UPDATE guests SET qr_code = ? WHERE id = ?`, [qrDataUrl, newId]);
+        triggerRealtimeUpdates();
+        res.json({ success: true, id: newId, qrCode: qrDataUrl });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/guests/batch-checkin', async (req, res) => {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'Invalid or empty IDs array.' });
+    }
+
+    const isCheckIn = status !== 'Not Checked-In';
+    const checkInTimeStr = isCheckIn 
+        ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+        : null;
+
+    const placeholders = ids.map(() => '?').join(',');
+    const sql = `UPDATE guests SET status = ?, check_in_time = ? WHERE id IN (${placeholders})`;
+    const params = [isCheckIn ? 'Checked-In' : 'Not Checked-In', checkInTimeStr, ...ids];
+
+    try {
+        const result = await dbRun(sql, params);
+        triggerRealtimeUpdates();
+        res.json({ success: true, updatedCount: result.changes });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/scan-checkin', async (req, res) => {
+    const { qrData, payload } = req.body;
+    const targetPayload = qrData || payload;
+
+    if (!targetPayload) {
+        return res.status(400).json({ error: 'Missing QR code scanner data.' });
+    }
+
+    try {
+        const result = await processQrScanCheckIn(targetPayload);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.delete('/api/guests/all', async (req, res) => {
+    try {
+        await clearGuestsTable();
+        triggerRealtimeUpdates();
+        res.json({ success: true, message: 'All guest records cleared.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/guests/:id/qrcode', async (req, res) => {
+    const guestId = req.params.id;
+
+    try {
+        const guest = await dbGet('SELECT * FROM guests WHERE id = ?', [guestId]);
+        if (!guest) return res.status(404).json({ error: 'Guest not found.' });
+
+        if (guest.qr_code) {
+            return res.json({ id: guest.id, qrCode: guest.qr_code });
+        }
+
+        const qrPayload = {
+            id: guest.id,
+            name: guest.name,
+            table: guest.seat_plan
+        };
+
+        const qrDataUrl = await generateQrCodeDataUrl(qrPayload);
+        await dbRun('UPDATE guests SET qr_code = ? WHERE id = ?', [qrDataUrl, guestId]);
+
+        res.json({ id: guest.id, qrCode: qrDataUrl });
+    } catch (err) {
+        console.error('QR Generation Error:', err);
+        res.status(500).json({ error: 'Failed to generate QR Code.' });
+    }
+});
+
+app.get('/api/table-occupation', async (req, res) => {
+    const query = `
+        SELECT 
+            seat_plan AS table_name,
+            COUNT(*) AS total_guests,
+            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in_count
+        FROM guests
+        GROUP BY seat_plan
+        ORDER BY seat_plan ASC
+    `;
+
+    try {
+        const rows = await dbAll(query);
+        res.json({ tables: rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/table-guests/:tableName', async (req, res) => {
+    const tableName = req.params.tableName;
+    try {
+        const rows = await dbAll(`SELECT * FROM guests WHERE seat_plan = ? ORDER BY name ASC`, [tableName]);
+        res.json({ table_name: tableName, guests: rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/recent-files', (req, res) => {
+    try {
+        const entries = fs.readdirSync(uploadDir, { withFileTypes: true });
+        const validFiles = entries
+            .filter(entry => {
+                if (!entry.isFile() || entry.name.startsWith('.')) return false;
+                const ext = path.extname(entry.name).toLowerCase();
+                return ['.xlsx', '.xls', '.csv'].includes(ext);
+            })
+            .map(entry => {
+                const fullPath = path.join(uploadDir, entry.name);
+                const stats = fs.statSync(fullPath);
+                return { name: entry.name, time: stats.mtimeMs };
+            })
+            .sort((a, b) => b.time - a.time)
+            .map(f => f.name);
+
+        res.json({ files: validFiles });
+    } catch (err) {
+        console.error('Error reading upload directory:', err);
+        res.status(500).json({ error: 'Unable to read uploads directory.' });
+    }
+});
+
+app.post('/api/load-file', async (req, res) => {
+    const fileName = req.query.name;
+    if (!fileName) return res.status(400).json({ error: 'Filename is required.' });
+
+    const safeFileName = path.basename(fileName);
+    const filePath = path.join(uploadDir, safeFileName);
+
+    if (!isPathInsideDir(filePath, uploadDir) || !fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found on server.' });
+    }
+
+    try {
+        const importedGuests = parseAndInsertExcel(filePath);
+        await clearGuestsTable();
+        await bulkInsertGuests(importedGuests);
+
+        triggerRealtimeUpdates();
+        res.json({ success: true, count: importedGuests.length, activeFile: safeFileName });
+    } catch (error) {
+        console.error('Load File Error:', error);
+        res.status(500).json({ error: 'Failed to process spreadsheet file.' });
+    }
+});
+
+app.delete('/api/recent-files/:fileName', async (req, res) => {
+    const rawFileName = decodeURIComponent(req.params.fileName);
+    const safeFileName = path.basename(rawFileName);
+    const filePath = path.join(uploadDir, safeFileName);
+
+    if (!isPathInsideDir(filePath, uploadDir)) {
+        return res.status(400).json({ error: 'Invalid file path.' });
+    }
+
+    if (fs.existsSync(filePath)) {
+        safeUnlink(filePath);
+    }
+
+    try {
+        await clearGuestsTable();
+        triggerRealtimeUpdates();
+
+        return res.json({ 
+            success: true, 
+            message: `File ${safeFileName} and associated guest records cleared.` 
+        });
+    } catch (err) {
+        console.error('Error clearing database on file removal:', err.message);
+        return res.status(500).json({ error: 'Failed to clear guest database.' });
+    }
+});
+
+app.put('/api/guests/:id', async (req, res) => {
+    const { name, nickname, category, seat_plan } = req.body;
+    const guestId = req.params.id;
+
+    try {
+        const qrDataUrl = await generateQrCodeDataUrl({ id: guestId, name, table: seat_plan });
+
+        await dbRun(
+            `UPDATE guests SET name = ?, nickname = ?, category = ?, seat_plan = ?, qr_code = ? WHERE id = ?`,
+            [name, nickname, category, seat_plan, qrDataUrl, guestId]
+        );
+
+        triggerRealtimeUpdates();
+        res.json({ success: true, qrCode: qrDataUrl });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/guests/:id', async (req, res) => {
+    try {
+        await dbRun(`DELETE FROM guests WHERE id = ?`, [req.params.id]);
+        triggerRealtimeUpdates();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/import', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+    try {
+        const importedGuests = parseAndInsertExcel(req.file.path);
+
+        if (importedGuests.length === 0) {
+            safeUnlink(req.file.path);
+            return res.status(400).json({ error: 'No valid guests found.' });
+        }
+
+        await clearGuestsTable();
+        await bulkInsertGuests(importedGuests);
+
+        triggerRealtimeUpdates();
+        res.json({ success: true, count: importedGuests.length, activeFile: req.file.originalname });
+    } catch (error) {
+        console.error('Import Error:', error);
+        if (req.file) safeUnlink(req.file.path);
+        res.status(500).json({ error: 'Failed to process Excel file.' });
+    }
+});
+
+app.get('/api/export', async (req, res) => {
+    const format = (req.query.format || 'excel').toLowerCase();
+
+    try {
+        const rows = await dbAll('SELECT * FROM guests ORDER BY name ASC');
+
+        const formattedRows = rows.map(r => ({
+            "Name": r.name || '',
+            "Nickname": r.nickname || '-',
+            "Category": r.category || 'Guest',
+            "Table": r.seat_plan || 'Unassigned',
+            "Status": r.status || 'Not Checked-In',
+            "Check-In Time": r.check_in_time || '-'
+        }));
+
+        if (['docs', 'doc', 'word'].includes(format)) {
+            let docHtml = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Guest List Export</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; background-color: #ffffff; color: #333333; }
+                        h2 { color: #0066cc; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                        th, td { border: 1px solid #dddddd; padding: 8px 12px; text-align: left; }
+                        th { background-color: #0066cc; color: #ffffff; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                    </style>
+                </head>
+                <body>
+                    <h2>Events By Anj - Guest List</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Nickname</th>
+                                <th>Category</th>
+                                <th>Table</th>
+                                <th>Status</th>
+                                <th>Check-In Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            formattedRows.forEach(r => {
+                docHtml += `
+                    <tr>
+                        <td>${escapeHtml(r.Name)}</td>
+                        <td>${escapeHtml(r.Nickname)}</td>
+                        <td>${escapeHtml(r.Category)}</td>
+                        <td>${escapeHtml(r.Table)}</td>
+                        <td>${escapeHtml(r.Status)}</td>
+                        <td>${escapeHtml(r["Check-In Time"])}</td>
+                    </tr>
+                `;
+            });
+
+            docHtml += `
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            res.setHeader('Content-Type', 'application/msword');
+            res.setHeader('Content-Disposition', 'attachment; filename="Guest_List_Export.doc"');
+            return res.send(docHtml);
+        } else {
+            const worksheet = XLSX.utils.json_to_sheet(formattedRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendee List');
+
+            const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', 'attachment; filename="Guest_List_Export.xlsx"');
+            return res.send(buffer);
+        }
+    } catch (err) {
+        console.error('Export Database Error:', err);
+        return res.status(500).send('Database export error');
+    }
+});
+
+/* ==========================================
+   SERVER INITIALIZATION & GRACEFUL SHUTDOWN
+   ========================================== */
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+
+let isShuttingDown = false;
+
+function gracefulShutdown(signal) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(`\nReceived ${signal}. Shutting down server gracefully`);
+
+    const forceExitTimeout = setTimeout(() => {
+        console.error('Forcefully terminating due to timeout.');
+        process.exit(1);
+    }, 5000);
+
+    server.close(() => {
+        console.log('HTTP/WebSocket server closed.');
+        db.close((err) => {
+            clearTimeout(forceExitTimeout);
+            if (err) {
+                console.error('Error closing SQLite DB:', err.message);
+                process.exit(1);
+            }
+            console.log('Database connection closed. Exiting process.');
+            process.exit(0);
+        });
+    });
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events By Anj</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <!-- Overlay for mobile sidebar navigation -->
+    <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
+
+    <div class="app-layout">
+        
+        <!-- Navigation Sidebar -->
+        <aside class="sidebar" id="appSidebar" aria-label="Main Navigation">
+            <div class="sidebar-header">
+                <h2>Events By Anj</h2>
+            </div>
+
+            <nav class="sidebar-section">
+                <span class="sidebar-label" id="navLabel">Navigation</span>
+                <div class="sidebar-menu" role="group" aria-labelledby="navLabel">
+                    <button type="button" id="btnNavDashboard" class="sidebar-nav-btn active">
+                        Main Dashboard
+                    </button>
+                    <button type="button" id="btnNavTables" class="sidebar-nav-btn">
+                        Seating Capacity Overview
+                    </button>
+                </div>
+            </nav>
+
+            <div class="sidebar-section">
+                <label for="excelFile" class="sidebar-label">Import File</label>
+                <div id="drop-zone" class="drop-zone">
+                    <div id="dropZonePrompt" class="drop-zone-prompt">
+                        <div class="upload-placeholder">
+                            <span class="upload-icon" aria-hidden="true">📁</span>
+                            <p> Add a File or <label for="excelFile" class="file-label">browse</label></p>
+                        </div>
+                    </div>
+                    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="file-input" multiple hidden />
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <span class="sidebar-label" id="recentFilesLabel">Recently Opened Files</span>
+                <div id="recentFilesContainer" class="recent-files-container" aria-labelledby="recentFilesLabel">
+                    <p class="empty-state">No recent files</p>
+                </div>
+            </div>
+
+            <!-- SIDEBAR QR CODE SECTION (Lalabas lamang sa Seating Capacity Overview view) -->
+            <div class="sidebar-section" id="sidebarQrSection" style="display: none;">
+                <span class="sidebar-label">Scan for Mobile Access</span>
+                <div id="sidebarQrCodeContainer" class="sidebar-qr-container" style="display: flex; justify-content: center; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;"></div>
+            </div>
+        </aside>
+
+        <!-- Main Content View -->
+        <main class="main-content">
+            
+            <header class="header">
+                <div class="header-container">
+                    <div class="header-title-group">
+                        <button type="button" id="btnToggleSidebar" class="mobile-sidebar-toggle" aria-label="Toggle Navigation Sidebar" aria-controls="appSidebar" aria-expanded="false">
+                            ☰
+                        </button>
+                        <h1 id="mainTitle">Dashboard</h1>
+                    </div>
+
+                    <div class="pull-switch-wrapper">
+                        <input type="checkbox" id="btnThemeToggle" class="pull-switch-checkbox" />
+                        <label for="btnThemeToggle" class="pull-switch-label" title="Toggle Light/Dark Theme">
+                            <span class="pull-string"></span>
+                            <span class="pull-handle">
+                                <svg class="theme-icon icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                                <svg class="theme-icon icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </header>
+
+            <section id="activeFilesContainer" class="active-files-section" aria-label="Active Uploaded Files"></section>
+
+            <!-- Dashboard Main View Panel -->
+            <div id="mainDashboardView" class="view-panel">
+                <section class="stats-container" aria-label="Guest Statistics Summary">
+                    <div class="stat-card">Total Guests: <strong id="stat-total">0</strong></div>
+                    <div class="stat-card checked-in">Checked-In: <strong id="stat-checked">0</strong></div>
+                    <div class="stat-card not-checked">Not Checked-In: <strong id="stat-not-checked">0</strong></div>
+                </section>
+
+                <section class="controls" aria-label="Data Operations">
+                    <button type="button" id="btnAddGuest" class="btn btn-outline">+ Add Guest</button>
+                    <button type="button" id="btnSaveExcel" class="btn btn-secondary">Save Excel</button>
+                    <button type="button" id="btnSaveDocs" class="btn btn-primary">Save Docs</button>
+                </section>
+
+                <section class="filter-row" aria-label="Guest Filters and Sorting">
+                    <div class="search-group">
+                        <input 
+                            type="search" 
+                            id="search" 
+                            placeholder="Search by name or nickname..." 
+                            class="search-input" 
+                            aria-label="Search by name or nickname"
+                        />
+                    </div>
+
+                    <select id="filterCategory" class="filter-select" aria-label="Filter by Category">
+                        <option value="">All Categories</option>
+                        <option value="VIP">VIP</option>
+                        <option value="Guest">Guest</option>
+                    </select>
+
+                    <select id="filterTable" class="filter-select" aria-label="Filter by Table Number">
+                        <option value="">All Tables</option>
+                    </select>
+
+                    <!-- DYNAMIC SORT OPTIONS -->
+                    <select id="sortBy" class="filter-select" aria-label="Sort Guests By">
+                        <option value="name-asc">Sort by: Name (A-Z)</option>
+                        <option value="name-desc">Sort by: Name (Z-A)</option>
+                        <option value="table-asc">Sort by: Table (Ascending)</option>
+                        <option value="status-checked">Sort by: Checked-In First</option>
+                        <option value="status-unchecked">Sort by: Not Checked-In First</option>
+                        <option value="time-desc">Sort by: Latest Check-In</option>
+                    </select>
+                </section>
+
+
+                <section class="table-container" aria-label="Guest List Table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Nickname</th>
+                                <th scope="col">Category</th>
+                                <th scope="col">Table No.</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Check-In Time</th>
+                                <th scope="col">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guestTable">
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            <!-- Tables Seating Capacity View Panel -->
+            <div id="mainTablesView" class="view-panel" style="display: none;">
+                <section class="dashboard-occupation-section">
+                    <div class="seating-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <!-- 1. LEFT TITLE -->
+                        <h3 style="margin: 0;">Seating Capacity Overview</h3>
+
+                        <!-- 2. SINGLE ATTENDANCE RATE CARD -->
+                        <div class="attendance-rate-card" style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05); padding: 10px 16px; border-radius: 8px;">
+                            <div class="rate-circle" style="font-weight: bold; font-size: 1.2rem; color: #10b981;">
+                                <span id="overallAttendancePct">0%</span>
+                            </div>
+                            <div class="rate-details" style="display: flex; flex-direction: column;">
+                                <span class="rate-label" style="font-size: 0.7rem; opacity: 0.7; letter-spacing: 0.5px;">ATTENDANCE RATE</span>
+                                <span class="rate-counts" style="font-size: 0.85rem;"><strong id="checkedInCount">0</strong> / <span id="totalGuestsCount">0</span> Checked-In</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="standaloneOccupationGrid" class="main-occupation-grid">
+                        <p class="empty-state">No table assignments found.</p>
+                    </div>
+                </section>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Edit/Add Guest Modal -->
+    <div id="editModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="editModalTitle">Guest Details</h2>
+                <button type="button" class="modal-close" id="btnCloseEditModal" aria-label="Close Modal">&times;</button>
+            </div>
+            <form id="editGuestForm">
+                <input type="hidden" id="editGuestId" />
+                
+                <div class="form-group">
+                    <label for="editName">Guest Name *</label>
+                    <input type="text" id="editName" class="form-control" required placeholder="Enter full name" />
+                </div>
+
+                <div class="form-group">
+                    <label for="editNickname">Nickname</label>
+                    <input type="text" id="editNickname" class="form-control" placeholder="Optional nickname" />
+                </div>
+
+                <div class="form-group">
+                    <label for="editCategory">Category</label>
+                    <select id="editCategory" class="form-control">
+                        <option value="Guest">Guest</option>
+                        <option value="VIP">VIP</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="editTable">Table Number</label>
+                    <input type="text" id="editTable" class="form-control" placeholder="Table 1" />
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" id="btnCancelEdit">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Guest</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table Guests Breakdown Modal -->
+    <div id="tableGuestsModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="tableModalTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="tableModalTitle">Table Details</h2>
+                <button type="button" class="modal-close" id="btnCloseTableModal" aria-label="Close Table Modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <ul id="tableGuestsList" class="table-guest-list">
+                </ul>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-primary" id="btnDismissTableModal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>
