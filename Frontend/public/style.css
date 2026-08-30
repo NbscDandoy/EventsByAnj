@@ -879,6 +879,7 @@ body {
 .pull-switch-checkbox:checked + .pull-switch-label .icon-moon {
   display: block;
 }
+
 /* ==========================================
    OCCUPATION GRIDS & CARDS
    ========================================== */
@@ -1446,4 +1447,22 @@ body.dark-mode .badge-guest,
   #standaloneOccupationGrid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
+}
+
+/* ==========================================
+   NO-SCROLL SEATING OVERVIEW OVERRIDES
+   ========================================== */
+#mainTablesView {
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
+#standaloneOccupationGrid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.table-occupation-card {
+  word-break: break-word;
 }
