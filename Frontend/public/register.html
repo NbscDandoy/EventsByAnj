@@ -5,61 +5,115 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Event Self-Registration</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body { 
             font-family: Arial, sans-serif; 
-            background-color: #f4f6f9; 
+            background-color: #121212; 
+            color: #ffffff;
             display: flex; 
             justify-content: center; 
             align-items: center; 
             min-height: 100vh; 
             margin: 0; 
+            padding: 20px;
         }
         .card { 
-            background: white; 
-            padding: 25px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            background: #1e1e1e; 
+            padding: 30px 25px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5); 
             width: 100%; 
             max-width: 400px; 
             text-align: center; 
+            border: 1px solid #2d2d2d;
         }
         h2 { 
-            color: #0066cc; 
+            color: #4da6ff; 
+            margin-top: 0;
             margin-bottom: 20px; 
+            font-size: 24px;
         }
-        input, select, button { 
+        input { 
             width: 100%; 
-            padding: 12px; 
+            padding: 14px; 
             margin: 8px 0; 
-            border: 1px solid #ccc; 
-            border-radius: 6px; 
-            box-sizing: border-box; 
+            border: 1px solid #3d3d3d; 
+            background-color: #2b2b2b;
+            color: #ffffff;
+            border-radius: 8px; 
             font-size: 16px; 
+            outline: none;
+        }
+        input::placeholder {
+            color: #aaaaaa;
+        }
+        input:focus {
+            border-color: #4da6ff;
         }
         button { 
-            background-color: #28a745; 
+            width: 100%;
+            padding: 14px;
+            background-color: #16a34a; 
             color: white; 
             border: none; 
+            border-radius: 8px;
+            font-size: 18px;
             font-weight: bold; 
             cursor: pointer; 
+            margin-top: 10px;
+            transition: background 0.2s ease-in-out;
         }
         button:hover { 
-            background-color: #218838; 
+            background-color: #15803d; 
+        }
+        button:disabled {
+            background-color: #4b5563;
+            cursor: not-allowed;
         }
         .message { 
-            margin-top: 15px; 
-            font-weight: bold; 
-            padding: 10px; 
-            border-radius: 6px; 
+            margin-top: 20px; 
+            padding: 15px; 
+            border-radius: 12px; 
             display: none; 
+            text-align: center;
         }
         .success { 
-            background-color: #d4edda; 
-            color: #155724; 
+            background-color: #064e3b; 
+            color: #ecfdf5; 
+            border: 1px solid #059669;
         }
         .error { 
-            background-color: #f8d7da; 
-            color: #721c24; 
+            background-color: #7f1d1d; 
+            color: #fef2f2; 
+            border: 1px solid #dc2626;
+        }
+        
+        /* MALAKING TABLE NUMBER CARD */
+        .table-card {
+            margin-top: 15px;
+            padding: 20px 15px;
+            background: #0f172a;
+            border-radius: 12px;
+            border: 2px solid #22c55e;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+        }
+        .table-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #94a3b8;
+            margin: 0 0 6px 0;
+            font-weight: 600;
+        }
+        .table-display {
+            font-size: 42px; /* MALAKING TABLE NUMBER */
+            font-weight: 900;
+            color: #38bdf8;
+            margin: 0;
+            line-height: 1.1;
+            word-break: break-word;
         }
     </style>
 </head>
@@ -69,8 +123,8 @@
     <h2>Event Registration</h2>
     <form id="regForm" autocomplete="off">
         <input type="text" id="name" placeholder="Full Name" required />
-        <input type="text" id="nickname" placeholder="Nickname" required />
-        <button type="submit">Submit & Check-In</button>
+        <input type="text" id="nickname" placeholder="Nickname (Optional)" />
+        <button type="submit" id="btnSubmit">Submit & Check-In</button>
     </form>
 
     <div id="msgBox" class="message" aria-live="polite"></div>
@@ -79,10 +133,19 @@
 <script>
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = document.getElementById('name').value;
-        const nickname = document.getElementById('nickname').value;
+        
+        const nameInput = document.getElementById('name');
+        const nicknameInput = document.getElementById('nickname');
+        const btnSubmit = document.getElementById('btnSubmit');
         const msgBox = document.getElementById('msgBox');
 
+        const name = nameInput.value.trim();
+        const nickname = nicknameInput.value.trim();
+
+        if (!name) return;
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = 'Processing...';
         msgBox.style.display = 'none';
 
         try {
@@ -96,18 +159,32 @@
 
             if (data.success) {
                 msgBox.className = 'message success';
-                msgBox.innerText = data.message;
+                
+                // Ginagamit ang innerHTML para ma-render ang MALAKING Table Number
+                msgBox.innerHTML = `
+                    <div style="font-size: 16px; font-weight: bold;">
+                        ${data.message}
+                    </div>
+                    <div class="table-card">
+                        <p class="table-title">YOUR TABLE / SEAT NUMBER</p>
+                        <p class="table-display">${data.table_no || 'Unassigned'}</p>
+                    </div>
+                `;
+                
                 msgBox.style.display = 'block';
                 document.getElementById('regForm').reset();
             } else {
                 msgBox.className = 'message error';
-                msgBox.innerText = data.error || 'An error occurred.';
+                msgBox.innerText = data.error || 'An error occurred during registration.';
                 msgBox.style.display = 'block';
             }
         } catch (err) {
             msgBox.className = 'message error';
-            msgBox.innerText = 'Network error. Try again .';
+            msgBox.innerText = 'Network error. Please try again.';
             msgBox.style.display = 'block';
+        } finally {
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = 'Submit & Check-In';
         }
     });
 </script>
