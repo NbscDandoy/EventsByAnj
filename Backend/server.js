@@ -359,7 +359,7 @@ io.on('connection', (socket) => {
    REST API ENDPOINTS
    ========================================== */
 
-// 1. PUBLIC SELF-REGISTRATION ENDPOINT (SYNCED & INCLUDES TABLE NO.)
+// 1. PUBLIC SELF-REGISTRATION ENDPOINT (SMART MATCHING & INCLUDES TABLE NO.)
 app.post('/api/register', async (req, res) => {
     const { name, nickname, category, seat_plan } = req.body;
 
@@ -367,41 +367,70 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Pakilagay ang iyong pangalan.' });
     }
 
-    const cleanName = name.trim();
-    const guestCategory = category || 'Walk-in Guest';
-    const guestSeat = seat_plan || 'Unassigned';
+    const inputName = name.trim().toLowerCase();
+    const cleanWords = inputName.replace(/[^a-z0-9\s]/gi, '').split(/\s+/).filter(Boolean);
     const checkInTimeStr = getPhilippineTime();
 
     try {
-        const existingGuest = stmtSelectGuestByName.get(cleanName);
+        const allGuests = stmtSelectAllGuests.all();
 
-        if (existingGuest) {
-            stmtUpdateStatus.run('Checked-In', checkInTimeStr, existingGuest.id);
+        // Smart Name Matching: Titignan kung nagtutugma ang First/Last name (halimbawa "Kyla abella" vs "Abella, Kyla Gelle L.")
+        const matchedGuest = allGuests.find(g => {
+            const dbNameLower = (g.name || '').toLowerCase();
+            const dbCleanWords = dbNameLower.replace(/[^a-z0-9\s]/gi, '').split(/\s+/).filter(Boolean);
+
+            if (dbNameLower === inputName) return true;
+
+            // Kapag kahit 2 keywords ang nag-match sa DB entry
+            const matchingWords = cleanWords.filter(word => dbCleanWords.includes(word));
+            if (cleanWords.length >= 2 && matchingWords.length >= 2) return true;
+
+            // Subukan ang simpleng substring check
+            if (cleanWords.length === 1 && dbCleanWords.includes(cleanWords[0])) return true;
+
+            return false;
+        });
+
+        if (matchedGuest) {
+            // I-update ang umiiral na bisita imbes na gumawa ng duplicate
+            stmtUpdateStatus.run('Checked-In', checkInTimeStr, matchedGuest.id);
+            
+            // I-update ang nickname kung may ipinasok ang bisita
+            if (nickname && nickname.trim() !== '') {
+                db.prepare('UPDATE guests SET nickname = ? WHERE id = ?').run(nickname.trim(), matchedGuest.id);
+            }
+
             triggerRealtimeUpdates();
 
             return res.json({
                 success: true,
-                message: `Thank you for registering, ${existingGuest.name}!`,
-                table_no: existingGuest.seat_plan || 'Unassigned',
-                guest: { ...existingGuest, status: 'Checked-In', check_in_time: checkInTimeStr }
+                message: `Thank you for registering, ${matchedGuest.name}!`,
+                table_no: matchedGuest.seat_plan || 'Unassigned',
+                is_existing: true,
+                guest: { ...matchedGuest, status: 'Checked-In', check_in_time: checkInTimeStr }
             });
         }
+
+        // Kung WALA sa Excel file/Database, i-save bilang bagong Walk-in Guest
+        const guestCategory = category || 'Walk-in Guest';
+        const guestSeat = seat_plan || 'Unassigned';
 
         const result = db.prepare(`
             INSERT INTO guests (name, nickname, category, seat_plan, status, check_in_time)
             VALUES (?, ?, ?, ?, 'Checked-In', ?)
-        `).run(cleanName, nickname || '', guestCategory, guestSeat, checkInTimeStr);
+        `).run(name.trim(), nickname || '', guestCategory, guestSeat, checkInTimeStr);
 
         const newId = result.lastInsertRowid;
-        const personalQr = await generateQrCodeDataUrl({ id: newId, name: cleanName, table: guestSeat });
+        const personalQr = await generateQrCodeDataUrl({ id: newId, name: name.trim(), table: guestSeat });
         stmtUpdateQrCode.run(personalQr, newId);
 
         triggerRealtimeUpdates();
 
-        res.json({
+        return res.json({
             success: true,
-            message: `Thank you for registering, ${cleanName}! Welcome to the event.`,
+            message: `Thank you for registering, ${name.trim()}! Welcome to the event.`,
             table_no: guestSeat,
+            is_existing: false,
             id: newId
         });
 
