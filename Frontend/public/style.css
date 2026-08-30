@@ -1169,16 +1169,20 @@ body {
   text-align: center;
 }
 
+/* DARK MODE VIP BADGE (DEFAULT) */
 .badge-vip {
   background-color: rgba(212, 175, 55, 0.2);
   color: #ffe259;
   border: 1px solid rgba(212, 175, 55, 0.4);
 }
 
-body.light-mode .badge-vip {
-  background-color: #fef3c7;
-  color: #92400e;
-  border: none;
+/* LIGHT MODE VIP BADGE (BLACK TEXT FOR HIGH CONTRAST) */
+body.light-mode .badge-vip,
+[data-theme="light"] .badge-vip {
+  background-color: #fef08a !important;
+  color: #000000 !important;
+  border: 1px solid #eab308 !important;
+  font-weight: 800 !important;
 }
 
 .badge-guest {
@@ -1186,7 +1190,8 @@ body.light-mode .badge-vip {
   color: #f3f4f6;
 }
 
-body.light-mode .badge-guest {
+body.light-mode .badge-guest,
+[data-theme="light"] .badge-guest {
   background-color: #e2e8f0;
   color: #1e293b;
 }
