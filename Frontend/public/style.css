@@ -150,17 +150,18 @@ body.light-mode .active-file-container {
   font-size: 1.25rem;
 }
 
-/* LIGHT MODE HEADERS: Playfair Display + Deep Silk Gold Gradient */
+/* LIGHT MODE HEADERS: Playfair Display + High-Contrast Slate Navy & Bronze */
 body.light-mode .header h1,
 body.light-mode .seating-title,
 body.light-mode .modal-header h2,
 body.light-mode .sidebar-header h2 {
   font-family: var(--font-serif-light);
   letter-spacing: 0.02em;
-  background: linear-gradient(135deg, #1a1a1a 0%, #63502d 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #854d0e 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: none;
+  text-shadow: none !important;
+  filter: none !important;
 }
 
 /* ==========================================
