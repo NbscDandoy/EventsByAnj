@@ -76,34 +76,38 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModalKeybinds();
     setupGlobalControls();
     setupEventDelegation();
+    setupSelfCheckInLogic();
 
-    // Default: Sa Dashboard View papasok ang Admin/Owner kung walang #seating hash
-    if (window.location.hash === '#seating') {
-        switchTab('tables');
-    } else {
-        switchTab('dashboard');
-    }
+    // Check URL Hash on initial load
+    handleRouteHash();
 });
 
 // Listener kapag nagbago ang URL hash
 window.addEventListener('hashchange', () => {
-    if (window.location.hash === '#seating') {
+    handleRouteHash();
+});
+
+function handleRouteHash() {
+    const hash = window.location.hash;
+    if (hash === '#seating') {
         switchTab('tables');
+    } else if (hash === '#qrstand') {
+        switchTab('qrstand');
+    } else if (hash === '#selfcheckin') {
+        switchTab('selfcheckin');
     } else {
         switchTab('dashboard');
     }
-});
+}
 
 /* ==========================================
-   SIDEBAR QR CODE GENERATOR
+   SIDEBAR & STANDEE QR CODE GENERATORS
    ========================================== */
 function generateSeatingQRCode() {
-    const container = document.getElementById('sidebarQrCodeContainer') || document.getElementById('seatingQrCodeContainer');
+    const container = document.getElementById('sidebarQrCodeContainer');
     if (!container) return;
 
     container.innerHTML = '';
-    
-    // Idagdag ang #seating hash tag para sa direct routing
     const seatingURL = `${window.location.origin}${window.location.pathname}#seating`;
 
     if (typeof QRCode !== 'undefined') {
@@ -116,13 +120,51 @@ function generateSeatingQRCode() {
             correctLevel: QRCode.CorrectLevel.H
         });
     } else {
-        const fallbackImg = document.createElement('img');
-        fallbackImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(seatingURL)}`;
-        fallbackImg.alt = 'QR Code';
-        fallbackImg.style.width = '128px';
-        fallbackImg.style.height = '128px';
-        container.appendChild(fallbackImg);
+        renderFallbackQR(container, seatingURL, 128);
     }
+}
+
+async function generateEventQrStandee() {
+    const container = document.getElementById('eventQrStandContainer');
+    const labelEl = document.getElementById('qrStandFileLabel');
+    if (!container) return;
+
+    container.innerHTML = '<p class="empty-state">Generating QR Code...</p>';
+
+    if (labelEl) {
+        labelEl.textContent = `Active File: ${formatFileName(currentActiveFile) || 'Default Event'}`;
+    }
+
+    try {
+        // Direct fetch sa backend master QR endpoint (/api/event-qrcode)
+        const res = await fetch('/api/event-qrcode');
+        const data = await res.json();
+
+        if (data.success && data.qrCode) {
+            container.innerHTML = `
+                <img src="${data.qrCode}" alt="Event Registration QR" style="width: 220px; height: 220px; border-radius: 8px; border: 1px solid #ddd;">
+                <p style="font-size: 0.85rem; color: var(--subtext-color); margin-top: 8px;">
+                    Scan to Register & Check-In
+                </p>
+            `;
+        } else {
+            throw new Error('QR data missing');
+        }
+    } catch (err) {
+        console.error('Error fetching event QR code:', err);
+        const fallbackURL = `${window.location.origin}/register.html`;
+        container.innerHTML = '';
+        renderFallbackQR(container, fallbackURL, 200);
+    }
+}
+
+function renderFallbackQR(container, url, size) {
+    const fallbackImg = document.createElement('img');
+    fallbackImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`;
+    fallbackImg.alt = 'QR Code';
+    fallbackImg.style.width = `${size}px`;
+    fallbackImg.style.height = `${size}px`;
+    container.appendChild(fallbackImg);
 }
 
 /* ==========================================
@@ -153,53 +195,151 @@ function initTheme() {
 function setupTabNavigation() {
     const btnNavDashboard = document.getElementById('btnNavDashboard');
     const btnNavTables = document.getElementById('btnNavTables');
+    const btnNavQrStand = document.getElementById('btnNavQrStand');
 
     if (btnNavDashboard) btnNavDashboard.addEventListener('click', () => switchTab('dashboard'));
     if (btnNavTables) btnNavTables.addEventListener('click', () => switchTab('tables'));
+    if (btnNavQrStand) btnNavQrStand.addEventListener('click', () => switchTab('qrstand'));
 }
 
 function switchTab(tab) {
-    const mainDashboardView = document.getElementById('mainDashboardView');
-    const mainTablesView = document.getElementById('mainTablesView');
-    const btnNavDashboard = document.getElementById('btnNavDashboard');
-    const btnNavTables = document.getElementById('btnNavTables');
+    const views = {
+        dashboard: document.getElementById('mainDashboardView'),
+        tables: document.getElementById('mainTablesView'),
+        qrstand: document.getElementById('mainQrStandView'),
+        selfcheckin: document.getElementById('mainGuestSelfCheckInView')
+    };
+
+    const navBtns = {
+        dashboard: document.getElementById('btnNavDashboard'),
+        tables: document.getElementById('btnNavTables'),
+        qrstand: document.getElementById('btnNavQrStand')
+    };
+
     const mainTitle = document.getElementById('mainTitle');
     const sidebarQrSection = document.getElementById('sidebarQrSection');
 
-    if (tab === 'dashboard') {
-        // Ipakita ang Main Dashboard, itago ang Seating Overview
-        if (mainDashboardView) mainDashboardView.classList.remove('hidden');
-        if (mainTablesView) mainTablesView.classList.add('hidden');
-        
-        // Update Active States
-        if (btnNavDashboard) btnNavDashboard.classList.add('active');
-        if (btnNavTables) btnNavTables.classList.remove('active');
-        if (mainTitle) mainTitle.textContent = 'Dashboard';
+    // Itago lahat ng views at linisin ang active buttons
+    Object.values(views).forEach(v => v && v.classList.add('hidden'));
+    Object.values(navBtns).forEach(b => b && b.classList.remove('active'));
 
-        // Itatago ang Sidebar QR code sa Dashboard view
-        if (sidebarQrSection) sidebarQrSection.classList.add('hidden');
+    // Ipakita ang napiling view
+    if (views[tab]) views[tab].classList.remove('hidden');
+    if (navBtns[tab]) navBtns[tab].classList.add('active');
 
-    } else if (tab === 'tables') {
-        // Itago ang Main Dashboard, ipakita ang Seating Overview
-        if (mainDashboardView) mainDashboardView.classList.add('hidden');
-        if (mainTablesView) mainTablesView.classList.remove('hidden');
-        
-        // Update Active States
-        if (btnNavDashboard) btnNavDashboard.classList.remove('active');
-        if (btnNavTables) btnNavTables.classList.add('active');
-        if (mainTitle) mainTitle.textContent = 'Seating Capacity Overview';
+    if (sidebarQrSection) sidebarQrSection.classList.add('hidden');
 
-        // Pakita ang Sidebar QR code sa seating tab
-        if (sidebarQrSection) sidebarQrSection.classList.remove('hidden');
-
-        // I-fetch ang seating data
-        loadTableOccupation();
-
-        // I-generate ang QR code
-        if (typeof generateSeatingQRCode === 'function') {
+    switch (tab) {
+        case 'dashboard':
+            if (mainTitle) mainTitle.textContent = 'Dashboard';
+            break;
+        case 'tables':
+            if (mainTitle) mainTitle.textContent = 'Seating Capacity Overview';
+            if (sidebarQrSection) sidebarQrSection.classList.remove('hidden');
+            loadTableOccupation();
             generateSeatingQRCode();
+            break;
+        case 'qrstand':
+            if (mainTitle) mainTitle.textContent = 'Registration QR Standee';
+            generateEventQrStandee();
+            break;
+        case 'selfcheckin':
+            if (mainTitle) mainTitle.textContent = 'Guest Self Check-In';
+            break;
+    }
+}
+
+/* ==========================================
+   GUEST SELF CHECK-IN LOGIC
+   ========================================== */
+let selectedSelfCheckInGuest = null;
+
+function setupSelfCheckInLogic() {
+    const searchInput = document.getElementById('selfCheckInSearch');
+    const resultList = document.getElementById('selfCheckInResultList');
+    const confirmBtn = document.getElementById('btnSelfConfirmCheckIn');
+
+    if (searchInput && resultList) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            resultList.innerHTML = '';
+
+            if (!query) {
+                resultList.classList.add('hidden');
+                return;
+            }
+
+            const matches = guests.filter(g => 
+                (g.name && g.name.toLowerCase().includes(query)) ||
+                (g.nickname && g.nickname.toLowerCase().includes(query))
+            ).slice(0, 5); // Limit to top 5 results
+
+            if (matches.length === 0) {
+                resultList.innerHTML = `<li class="no-result">No matching guest found</li>`;
+            } else {
+                resultList.innerHTML = matches.map(g => `
+                    <li class="guest-search-item" data-id="${g.id}">
+                        <strong>${escapeHtml(g.name)}</strong>
+                        ${g.nickname ? `<small>(${escapeHtml(g.nickname)})</small>` : ''}
+                    </li>
+                `).join('');
+            }
+            resultList.classList.remove('hidden');
+        });
+
+        resultList.addEventListener('click', (e) => {
+            const item = e.target.closest('.guest-search-item');
+            if (!item) return;
+
+            const guestId = item.dataset.id;
+            selectedSelfCheckInGuest = guests.find(g => String(g.id) === String(guestId));
+
+            if (selectedSelfCheckInGuest) {
+                displaySelfCheckInResult(selectedSelfCheckInGuest);
+                resultList.classList.add('hidden');
+                searchInput.value = selectedSelfCheckInGuest.name;
+            }
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            if (selectedSelfCheckInGuest) {
+                playSwitchSound('checkin');
+                checkIn(selectedSelfCheckInGuest.id);
+                
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Checked-In Successfully!`;
+                confirmBtn.style.backgroundColor = 'var(--success-color, #28a745)';
+            }
+        });
+    }
+}
+
+function displaySelfCheckInResult(guest) {
+    const card = document.getElementById('selfCheckInResultCard');
+    const nameEl = document.getElementById('selfGuestName');
+    const tableBadge = document.getElementById('selfTableBadge');
+    const confirmBtn = document.getElementById('btnSelfConfirmCheckIn');
+
+    if (!card) return;
+
+    if (nameEl) nameEl.textContent = guest.name;
+    if (tableBadge) tableBadge.textContent = guest.seat_plan ? guest.seat_plan.toUpperCase() : 'UNASSIGNED';
+
+    if (confirmBtn) {
+        if (guest.status === 'Checked-In') {
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Already Checked-In`;
+            confirmBtn.style.backgroundColor = 'var(--subtext-color, #6c757d)';
+        } else {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Check-In Now`;
+            confirmBtn.style.backgroundColor = '';
         }
     }
+
+    card.classList.remove('hidden');
 }
 
 /* ==========================================
@@ -273,11 +413,7 @@ function showLoadingSpinner(show) {
 async function processSelectedFiles(files) {
     try {
         showLoadingSpinner(true);
-
-        // Fast parallel upload ng selected files
         await uploadExcelFiles(files);
-
-        // Parallel update para sa recent file list at UI render
         await Promise.all([
             fetchRecentFiles(),
             loadGuests()
@@ -350,7 +486,7 @@ function renderRecentFilesSidebar() {
         return `
             <div class="recent-file-item ${isCurrent ? 'active' : ''}">
                 <span class="recent-file-name" title="${escapedName}">
-                    <i class="fa-regular fa-file-excel" style="color: var(--success-color);"></i> ${escapedName}
+                    <i class="fa-regular fa-file-excel" style="color: var(--success-color, #28a745);"></i> ${escapedName}
                 </span>
                 <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
                     <button class="btn-load-file btn ${buttonClass}" style="padding: 2px 8px; font-size: 0.72rem;" ${disabledAttr} data-file-name="${escapedName}">${buttonText}</button>
@@ -399,7 +535,6 @@ async function selectAndLoadFile(fileName) {
 async function removeRecentFile(e, fileName) {
     if (e) e.stopPropagation();
 
-    // Linisin ang file name para maging maayos sa user-facing confirm prompt
     const cleanFileName = formatFileName(fileName);
 
     if (!confirm(`Are you sure you want to delete "${cleanFileName}"?\n\nThis will clear all guest records associated with this file.`)) {
@@ -417,20 +552,15 @@ async function removeRecentFile(e, fileName) {
     } catch (err) {
         console.error('Error syncing file removal with backend server:', err);
     } finally {
-        // Alisin sa array ng loadedFiles
         loadedFiles = loadedFiles.filter(f => f !== fileName);
         
-        // SURIIN KUNG ANG BINURANG FILE AY ANG KASALUKUYANG ACTIVE FILE
         if (currentActiveFile === fileName) {
-            // Piliin ang pinakahuling natirang file (kung mayroon)
             const remainingFile = loadedFiles.length > 0 ? loadedFiles[loadedFiles.length - 1] : '';
             currentActiveFile = remainingFile;
 
-            // KUNG MAY NATIRANG FILE, I-LOAD AT I-SYNC ITO SA BACKEND AGAD
             if (remainingFile) {
                 await selectAndLoadFile(remainingFile);
             } else {
-                // KUNG WALA NANG NATIRANG FILE, LINISIN ANG STATE
                 saveStateToLocalStorage();
                 await Promise.all([
                     fetchRecentFiles(),
@@ -438,7 +568,6 @@ async function removeRecentFile(e, fileName) {
                 ]);
             }
         } else {
-            // Kung hindi naman active file ang binura, simpleng refresh lang ng state
             saveStateToLocalStorage();
             await Promise.all([
                 fetchRecentFiles(),
@@ -503,11 +632,9 @@ function clearSelectedChip(event, fileName) {
     removeRecentFile(null, fileName);
 }
 
-// FAST ASYNC/PARALLEL FILE UPLOAD METHOD
 async function uploadExcelFiles(files) {
     let successCount = 0;
 
-    // Isabay-sabay ang pag-upload ng mga file gamit ang Promise.all
     const uploadPromises = Array.from(files).map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -720,7 +847,6 @@ async function loadTableOccupation() {
     }
 }
 
-// HELPER FUNCTION PARA SA SORTING NG MGA MESA
 function sortTablesList(tables) {
     return [...tables].sort((a, b) => {
         const nameA = String(a.table_name || a.seat_plan || a || '').trim();
@@ -954,7 +1080,7 @@ function renderTable(data) {
             <button class="btn btn-edit" title="Edit guest info"><i class="fa-solid fa-pen-to-square"></i></button>
             <button class="btn btn-delete" title="Delete guest"><i class="fa-solid fa-trash"></i></button>
         ` : `
-            <button class="btn btn-checkin" style="background-color: var(--success-color);" disabled><i class="fa-solid fa-check-double"></i> Done</button>
+            <button class="btn btn-checkin" style="background-color: var(--success-color, #28a745);" disabled><i class="fa-solid fa-check-double"></i> Done</button>
             <button class="btn btn-undo" title="Undo check-in"><i class="fa-solid fa-rotate-left"></i> Undo</button>
             <button class="btn btn-edit" title="Edit guest info"><i class="fa-solid fa-pen-to-square"></i></button>
             <button class="btn btn-delete" title="Delete guest"><i class="fa-solid fa-trash"></i></button>
@@ -1130,6 +1256,12 @@ socket.on('guestUpdated', ({ id, status, check_in_time }) => {
     if (guestIndex !== -1) {
         guests[guestIndex].status = status;
         guests[guestIndex].check_in_time = check_in_time;
+        
+        // Dynamic re-render kapag si self-check-in user ang na-update
+        if (selectedSelfCheckInGuest && String(selectedSelfCheckInGuest.id) === String(id)) {
+            selectedSelfCheckInGuest.status = status;
+            displaySelfCheckInResult(selectedSelfCheckInGuest);
+        }
     }
     applyFilters();
     loadTableOccupation();

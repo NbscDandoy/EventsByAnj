@@ -22,19 +22,21 @@ if (!fs.existsSync(uploadDir)) {
    HELPER FOR PHILIPPINE STANDARD TIME (PST)
    ========================================== */
 function getPhilippineTime() {
-    return new Date().toLocaleTimeString('en-US', {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // YYYY-MM-DD
+    const timeStr = now.toLocaleTimeString('en-US', {
         timeZone: 'Asia/Manila',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
         hour12: true
     });
+    return `${dateStr} ${timeStr}`;
 }
 
 /* ==========================================
-   MULTER CONFIGURATION (MEMORY STORAGE FOR RELIABILITY)
+   MULTER CONFIGURATION (MEMORY STORAGE)
    ========================================== */
-// Standard memory storage (works seamlessly on Render/Heroku and local disk)
 const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 15 * 1024 * 1024 } // 15MB Limit
@@ -43,7 +45,7 @@ const upload = multer({
 app.use(express.json());
 
 /* ==========================================
-   RESPONSIVE DYNAMIC STATIC FILE SERVING
+   DYNAMIC STATIC FILE SERVING
    ========================================== */
 const possiblePublicPaths = [
     path.join(__dirname, '..', 'Frontend', 'public'),
@@ -60,7 +62,7 @@ app.use(express.static(publicPath));
 const dbPath = path.join(__dirname, 'events.db');
 const db = new Database(dbPath);
 
-// Enable Write-Ahead Logging (WAL)
+// Enable Write-Ahead Logging (WAL) for better performance
 db.pragma('journal_mode = WAL');
 
 db.exec(`
@@ -76,12 +78,41 @@ db.exec(`
     )
 `);
 
-// Dynamic Schema Migration Check
+// Clean direct column schema check
 const columns = db.pragma('table_info(guests)');
-const hasQrCode = columns.some(col => col.name === 'qr_code');
-if (!hasQrCode) {
+if (!columns.some(col => col.name === 'qr_code')) {
     db.exec(`ALTER TABLE guests ADD COLUMN qr_code TEXT`);
 }
+
+/* ==========================================
+   PREPARED STATEMENTS (REUSABLE & OPTIMIZED)
+   ========================================== */
+const stmtSelectAllGuests = db.prepare('SELECT * FROM guests ORDER BY name ASC');
+const stmtSelectGuestById = db.prepare('SELECT * FROM guests WHERE id = ?');
+const stmtSelectGuestByName = db.prepare('SELECT * FROM guests WHERE LOWER(name) = LOWER(?)');
+const stmtInsertGuest = db.prepare('INSERT INTO guests (name, nickname, category, seat_plan, qr_code) VALUES (?, ?, ?, ?, ?)');
+const stmtUpdateQrCode = db.prepare('UPDATE guests SET qr_code = ? WHERE id = ?');
+const stmtUpdateStatus = db.prepare('UPDATE guests SET status = ?, check_in_time = ? WHERE id = ?');
+const stmtDeleteGuest = db.prepare('DELETE FROM guests WHERE id = ?');
+
+const stmtDashboardMetrics = db.prepare(`
+    SELECT 
+        COUNT(*) AS total_guests,
+        SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in,
+        SUM(CASE WHEN status = 'Not Checked-In' OR status IS NULL THEN 1 ELSE 0 END) AS not_checked_in,
+        SUM(CASE WHEN category = 'VIP' THEN 1 ELSE 0 END) AS vip_count
+    FROM guests
+`);
+
+const stmtTableOccupation = db.prepare(`
+    SELECT 
+        seat_plan AS table_name,
+        COUNT(*) AS total_guests,
+        SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in_count
+    FROM guests
+    GROUP BY seat_plan
+    ORDER BY seat_plan ASC
+`);
 
 /* ==========================================
    HELPER FUNCTIONS & REAL-TIME EMITTERS
@@ -113,7 +144,7 @@ function isPathInsideDir(targetPath, parentDir) {
 
 async function generateQrCodeDataUrl(payloadObj) {
     try {
-        return await QRCode.toDataURL(JSON.stringify(payloadObj));
+        return await QRCode.toDataURL(typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj));
     } catch (err) {
         console.error('Error generating QR Code:', err);
         return null;
@@ -170,51 +201,38 @@ function clearGuestsTable() {
     try {
         db.prepare("DELETE FROM sqlite_sequence WHERE name='guests'").run();
     } catch (err) {
-        // Safe to ignore
+        // Safe to ignore if sequence table doesn't exist
     }
 }
 
-// Synchronous Transaction at hiwalay na Async QR Code Generation
+// Optimized Parallel Bulk Insertion
 async function bulkInsertGuests(guests) {
     if (!guests || guests.length === 0) return;
 
-    const insertStmt = db.prepare(
-        `INSERT INTO guests (name, nickname, category, seat_plan, qr_code) VALUES (?, ?, ?, ?, ?)`
-    );
-    const updateQrStmt = db.prepare(
-        `UPDATE guests SET qr_code = ? WHERE id = ?`
-    );
-
-    // Step 1: Synchronous Bulk Insert
     const insertedRecords = [];
+
+    // Step 1: Fast Transaction Insertion
     const runTransaction = db.transaction((list) => {
         for (const g of list) {
-            const res = insertStmt.run(g.name, g.nickname, g.category, g.seat_plan, null);
+            const res = stmtInsertGuest.run(g.name, g.nickname, g.category, g.seat_plan, null);
             insertedRecords.push({ id: res.lastInsertRowid, name: g.name, table: g.seat_plan });
         }
     });
 
     runTransaction(guests);
 
-    // Step 2: Async QR Code generation & update
-    for (const record of insertedRecords) {
-        const qrDataUrl = await generateQrCodeDataUrl({ id: record.id, name: record.name, table: record.table });
-        updateQrStmt.run(qrDataUrl, record.id);
-    }
+    // Step 2: Parallel QR Code Generation
+    await Promise.all(
+        insertedRecords.map(async (record) => {
+            const qrDataUrl = await generateQrCodeDataUrl({ id: record.id, name: record.name, table: record.table });
+            stmtUpdateQrCode.run(qrDataUrl, record.id);
+        })
+    );
 }
 
 function notifyTableOccupationChange() {
-    const query = `
-        SELECT 
-            seat_plan AS table_name,
-            COUNT(*) AS total_guests,
-            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in_count
-        FROM guests
-        GROUP BY seat_plan
-        ORDER BY seat_plan ASC
-    `;
     try {
-        const rows = db.prepare(query).all();
+        const rows = stmtTableOccupation.all();
         io.emit('tableOccupationUpdated', { tables: rows });
     } catch (err) {
         console.error('Error in notifyTableOccupationChange:', err.message);
@@ -222,16 +240,8 @@ function notifyTableOccupationChange() {
 }
 
 function notifyDashboardMetricsChange() {
-    const query = `
-        SELECT 
-            COUNT(*) AS total_guests,
-            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in,
-            SUM(CASE WHEN status = 'Not Checked-In' OR status IS NULL THEN 1 ELSE 0 END) AS not_checked_in,
-            SUM(CASE WHEN category = 'VIP' THEN 1 ELSE 0 END) AS vip_count
-        FROM guests
-    `;
     try {
-        const row = db.prepare(query).get();
+        const row = stmtDashboardMetrics.get();
         io.emit('dashboardMetricsUpdated', {
             total_guests: row ? row.total_guests || 0 : 0,
             checked_in: row ? row.checked_in || 0 : 0,
@@ -253,28 +263,20 @@ async function processQrScanCheckIn(qrPayload) {
     let parsedData = null;
     
     if (typeof qrPayload === 'string') {
-        try {
-            parsedData = JSON.parse(qrPayload);
-        } catch (e) {
-            parsedData = { raw: qrPayload };
-        }
+        try { parsedData = JSON.parse(qrPayload); } catch (e) { parsedData = { raw: qrPayload }; }
     } else if (typeof qrPayload === 'object' && qrPayload !== null) {
         parsedData = qrPayload;
     }
 
-    if (!parsedData) {
-        throw new Error('Invalid QR Payload format.');
-    }
+    if (!parsedData) throw new Error('Invalid QR Payload format.');
 
-    // Inayos: Philippine Standard Time (PST)
     const checkInTimeStr = getPhilippineTime();
-
     let guest = null;
 
     if (parsedData.id) {
-        guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(parsedData.id);
+        guest = stmtSelectGuestById.get(parsedData.id);
     } else if (parsedData.name) {
-        guest = db.prepare('SELECT * FROM guests WHERE LOWER(name) = LOWER(?)').get(parsedData.name.trim());
+        guest = stmtSelectGuestByName.get(parsedData.name.trim());
     } else if (parsedData.raw) {
         guest = db.prepare('SELECT * FROM guests WHERE id = ? OR LOWER(name) = LOWER(?)').get(parsedData.raw, parsedData.raw.trim());
     } else {
@@ -291,7 +293,7 @@ async function processQrScanCheckIn(qrPayload) {
         };
     }
 
-    db.prepare(`UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`).run(checkInTimeStr, guest.id);
+    stmtUpdateStatus.run('Checked-In', checkInTimeStr, guest.id);
 
     const updatedGuest = { ...guest, status: 'Checked-In', check_in_time: checkInTimeStr };
     
@@ -311,11 +313,9 @@ async function processQrScanCheckIn(qrPayload) {
    ========================================== */
 io.on('connection', (socket) => {
     socket.on('checkIn', ({ id }) => {
-        // Inayos: Philippine Standard Time (PST)
         const checkInTimeStr = getPhilippineTime();
-
         try {
-            const res = db.prepare(`UPDATE guests SET status = 'Checked-In', check_in_time = ? WHERE id = ?`).run(checkInTimeStr, id);
+            const res = stmtUpdateStatus.run('Checked-In', checkInTimeStr, id);
             if (res.changes > 0) {
                 io.emit('guestUpdated', { id, status: 'Checked-In', check_in_time: checkInTimeStr });
                 notifyTableOccupationChange();
@@ -328,7 +328,7 @@ io.on('connection', (socket) => {
 
     socket.on('uncheckIn', ({ id }) => {
         try {
-            const res = db.prepare(`UPDATE guests SET status = 'Not Checked-In', check_in_time = NULL WHERE id = ?`).run(id);
+            const res = stmtUpdateStatus.run('Not Checked-In', null, id);
             if (res.changes > 0) {
                 io.emit('guestUpdated', { id, status: 'Not Checked-In', check_in_time: null });
                 notifyTableOccupationChange();
@@ -363,17 +363,78 @@ io.on('connection', (socket) => {
    REST API ENDPOINTS
    ========================================== */
 
-app.get('/api/dashboard-summary', (req, res) => {
-    const query = `
-        SELECT 
-            COUNT(*) AS total_guests,
-            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in,
-            SUM(CASE WHEN status = 'Not Checked-In' OR status IS NULL THEN 1 ELSE 0 END) AS not_checked_in,
-            SUM(CASE WHEN category = 'VIP' THEN 1 ELSE 0 END) AS vip_count
-        FROM guests
-    `;
+// 1. PUBLIC SELF-REGISTRATION ENDPOINT (Para sa Master QR Code)
+app.post('/api/register', async (req, res) => {
+    const { name, nickname, category, seat_plan } = req.body;
+
+    if (!name || name.trim() === '') {
+        return res.status(400).json({ success: false, error: 'Pakilagay ang iyong pangalan.' });
+    }
+
+    const cleanName = name.trim();
+    const guestCategory = category || 'Walk-in Guest';
+    const guestSeat = seat_plan || 'Unassigned';
+    const checkInTimeStr = getPhilippineTime();
+
     try {
-        const row = db.prepare(query).get();
+        // Tignan kung nakatala na ang guest
+        const existingGuest = stmtSelectGuestByName.get(cleanName);
+
+        if (existingGuest) {
+            // Kung nariyan na, i-update lang ang status nito sa Checked-In
+            stmtUpdateStatus.run('Checked-In', checkInTimeStr, existingGuest.id);
+            triggerRealtimeUpdates();
+
+            return res.json({
+                success: true,
+                message: `Welcome, ${existingGuest.name}! Naka-check in ka na.`,
+                guest: existingGuest
+            });
+        }
+
+        // Kung bagong guest, i-save at i-check in
+        const result = db.prepare(`
+            INSERT INTO guests (name, nickname, category, seat_plan, status, check_in_time)
+            VALUES (?, ?, ?, ?, 'Checked-In', ?)
+        `).run(cleanName, nickname || '', guestCategory, guestSeat, checkInTimeStr);
+
+        const newId = result.lastInsertRowid;
+        const personalQr = await generateQrCodeDataUrl({ id: newId, name: cleanName });
+        stmtUpdateQrCode.run(personalQr, newId);
+
+        triggerRealtimeUpdates();
+
+        res.json({
+            success: true,
+            message: `Salamat sa pag-register, ${cleanName}! Welcome sa Event.`,
+            id: newId
+        });
+
+    } catch (err) {
+        console.error('Registration Error:', err.message);
+        res.status(500).json({ success: false, error: 'May problema sa pag-save ng registration.' });
+    }
+});
+
+// 2. MASTER EVENT QR CODE GENERATOR (Iisang QR Code para sa Lahat)
+app.get('/api/event-qrcode', async (req, res) => {
+    try {
+        const hostUrl = `${req.protocol}://${req.get('host')}/register.html`;
+        const qrDataUrl = await QRCode.toDataURL(hostUrl);
+
+        res.json({
+            success: true,
+            registrationUrl: hostUrl,
+            qrCode: qrDataUrl
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to generate Event QR Code' });
+    }
+});
+
+app.get('/api/dashboard-summary', (req, res) => {
+    try {
+        const row = stmtDashboardMetrics.get();
         res.json({
             total_guests: row ? row.total_guests || 0 : 0,
             checked_in: row ? row.checked_in || 0 : 0,
@@ -387,7 +448,7 @@ app.get('/api/dashboard-summary', (req, res) => {
 
 app.get('/api/guests', (req, res) => {
     try {
-        const rows = db.prepare('SELECT * FROM guests ORDER BY name ASC').all();
+        const rows = stmtSelectAllGuests.all();
         res.json({ guests: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -404,14 +465,11 @@ app.post('/api/guests', async (req, res) => {
     const guestSeat = seat_plan || 'Unassigned';
 
     try {
-        const result = db.prepare(
-            `INSERT INTO guests (name, nickname, category, seat_plan) VALUES (?, ?, ?, ?)`
-        ).run(name, nickname || '', guestCategory, guestSeat);
-
+        const result = stmtInsertGuest.run(name, nickname || '', guestCategory, guestSeat, null);
         const newId = result.lastInsertRowid;
         const qrDataUrl = await generateQrCodeDataUrl({ id: newId, name, table: guestSeat });
 
-        db.prepare(`UPDATE guests SET qr_code = ? WHERE id = ?`).run(qrDataUrl, newId);
+        stmtUpdateQrCode.run(qrDataUrl, newId);
         triggerRealtimeUpdates();
         res.json({ success: true, id: newId, qrCode: qrDataUrl });
     } catch (err) {
@@ -426,7 +484,6 @@ app.post('/api/guests/batch-checkin', (req, res) => {
     }
 
     const isCheckIn = status !== 'Not Checked-In';
-    // Inayos: Philippine Standard Time (PST)
     const checkInTimeStr = isCheckIn ? getPhilippineTime() : null;
 
     const placeholders = ids.map(() => '?').join(',');
@@ -472,21 +529,15 @@ app.get('/api/guests/:id/qrcode', async (req, res) => {
     const guestId = req.params.id;
 
     try {
-        const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(guestId);
+        const guest = stmtSelectGuestById.get(guestId);
         if (!guest) return res.status(404).json({ error: 'Guest not found.' });
 
         if (guest.qr_code) {
             return res.json({ id: guest.id, qrCode: guest.qr_code });
         }
 
-        const qrPayload = {
-            id: guest.id,
-            name: guest.name,
-            table: guest.seat_plan
-        };
-
-        const qrDataUrl = await generateQrCodeDataUrl(qrPayload);
-        db.prepare('UPDATE guests SET qr_code = ? WHERE id = ?').run(qrDataUrl, guestId);
+        const qrDataUrl = await generateQrCodeDataUrl({ id: guest.id, name: guest.name, table: guest.seat_plan });
+        stmtUpdateQrCode.run(qrDataUrl, guestId);
 
         res.json({ id: guest.id, qrCode: qrDataUrl });
     } catch (err) {
@@ -496,18 +547,8 @@ app.get('/api/guests/:id/qrcode', async (req, res) => {
 });
 
 app.get('/api/table-occupation', (req, res) => {
-    const query = `
-        SELECT 
-            seat_plan AS table_name,
-            COUNT(*) AS total_guests,
-            SUM(CASE WHEN status = 'Checked-In' THEN 1 ELSE 0 END) AS checked_in_count
-        FROM guests
-        GROUP BY seat_plan
-        ORDER BY seat_plan ASC
-    `;
-
     try {
-        const rows = db.prepare(query).all();
+        const rows = stmtTableOccupation.all();
         res.json({ tables: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -619,7 +660,7 @@ app.put('/api/guests/:id', async (req, res) => {
 
 app.delete('/api/guests/:id', (req, res) => {
     try {
-        db.prepare(`DELETE FROM guests WHERE id = ?`).run(req.params.id);
+        stmtDeleteGuest.run(req.params.id);
         triggerRealtimeUpdates();
         res.json({ success: true });
     } catch (err) {
@@ -628,7 +669,7 @@ app.delete('/api/guests/:id', (req, res) => {
 });
 
 /* ==========================================
-   CLEANER /API/IMPORT ENDPOINT
+   IMPORT & EXPORT ENDPOINTS
    ========================================== */
 app.post('/api/import', upload.single('file'), async (req, res) => {
     if (!req.file) {
@@ -636,7 +677,6 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
     }
 
     try {
-        // Read directly from memory buffer
         const importedGuests = parseAndInsertExcel(req.file.buffer);
 
         if (importedGuests.length === 0) {
@@ -646,7 +686,6 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         clearGuestsTable();
         await bulkInsertGuests(importedGuests);
 
-        // Optionally save a copy to uploads dir for recent files history
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e4);
         const ext = path.extname(req.file.originalname) || '.xlsx';
         const baseName = path.basename(req.file.originalname, ext);
@@ -669,7 +708,7 @@ app.get('/api/export', (req, res) => {
     const format = (req.query.format || 'excel').toLowerCase();
 
     try {
-        const rows = db.prepare('SELECT * FROM guests ORDER BY name ASC').all();
+        const rows = stmtSelectAllGuests.all();
 
         const formattedRows = rows.map(r => ({
             "Name": r.name || '',

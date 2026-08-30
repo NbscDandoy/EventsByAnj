@@ -31,6 +31,9 @@
                     <button type="button" id="btnNavTables" class="sidebar-nav-btn">
                         <i class="fa-solid fa-chair"></i> Seating Capacity Overview
                     </button>
+                    <button type="button" id="btnNavQrStand" class="sidebar-nav-btn">
+                        <i class="fa-solid fa-qrcode"></i> Registration QR Standee
+                    </button>
                 </div>
             </nav>
 
@@ -216,6 +219,61 @@
                         <p class="empty-state">No table assignments found.</p>
                     </div>
                 </section>
+            </div>
+
+            <!-- REGISTRATION QR STANDEE PANEL (Organizers) -->
+            <div id="mainQrStandView" class="view-panel hidden">
+                <div class="card-wrapper qr-standee-wrapper">
+                    <h2>Registration Desk QR Standee</h2>
+                    <p class="qr-description">
+                        I-print o i-display ang QR code na ito sa registration desk. I-i-scan ito ng mga bisita para mag-self check-in at malaman ang kanilang Table Assignment.
+                    </p>
+
+                    <!-- Printable Container -->
+                    <div id="printableQrCard" class="printable-qr-card">
+                        <img src="eva.jpg" alt="Logo" class="qr-brand-logo">
+                        <h3 class="qr-welcome-title">WELCOME TO THE EVENT</h3>
+                        <p class="qr-subtitle">Scan to Self Check-In & Find Your Seat</p>
+                        
+                        <div id="eventQrStandContainer" class="qr-code-display"></div>
+
+                        <p class="qr-file-label" id="qrStandFileLabel">Active File: Default Event</p>
+                    </div>
+
+                    <div class="qr-actions">
+                        <button type="button" class="btn btn-primary" onclick="window.print()">
+                            <i class="fa-solid fa-print"></i> Print QR Standee
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GUEST SELF CHECK-IN VIEW (Mobile/Guest View) -->
+            <div id="mainGuestSelfCheckInView" class="view-panel hidden">
+                <div class="card-wrapper self-checkin-wrapper">
+                    <img src="eva.jpg" alt="Events By Anj" class="self-checkin-logo">
+                    <h2>Welcome Guests!</h2>
+                    <p class="self-checkin-desc">I-search ang iyong pangalan upang makita ang iyong Table Number.</p>
+
+                    <div class="search-group self-search-group">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="selfCheckInSearch" class="search-input" placeholder="Type your name or nickname..." />
+                    </div>
+
+                    <ul id="selfCheckInResultList" class="guest-select-list">
+                        <!-- Dynamic guest search list items will render here -->
+                    </ul>
+
+                    <!-- Seat Result Display -->
+                    <div id="selfCheckInResultCard" class="seat-result-card hidden">
+                        <h3 id="selfGuestName" class="seat-guest-name">--</h3>
+                        <p class="seat-label">Your assigned seating:</p>
+                        <div id="selfTableBadge" class="seat-table-number">TABLE --</div>
+                        <button type="button" id="btnSelfConfirmCheckIn" class="btn btn-success btn-block">
+                            <i class="fa-solid fa-circle-check"></i> Check-In Now
+                        </button>
+                    </div>
+                </div>
             </div>
 
         </main>

@@ -1,4 +1,4 @@
-/* Import Fonts: Cinzel for Dark & Light Mode Headers (Consistent Font) */
+/* Import Fonts: Cinzel for Dark & Light Mode Headers (Must be at the top) */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:wght@600;700;800&display=swap');
 
 /* ==========================================
@@ -155,6 +155,7 @@ body.light-mode .active-file-container {
 .sidebar-header h2 {
   background: linear-gradient(135deg, #ffffff 20%, #ffe259 70%, #ffa751 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
 }
@@ -170,6 +171,7 @@ body.light-mode .sidebar-header h2,
 [data-theme="light"] .sidebar-header h2 {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 65%, #9a3412 100%) !important;
   -webkit-background-clip: text !important;
+  background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
   filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.08)) !important;
@@ -303,6 +305,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  touch-action: manipulation;
   transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
@@ -745,6 +748,7 @@ body {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  touch-action: manipulation;
   transition: background-color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
@@ -1224,6 +1228,7 @@ body.light-mode .badge-guest,
   align-items: center;
   z-index: 1000;
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   padding: 16px;
   opacity: 1;
   transition: opacity var(--transition-normal) ease;
@@ -1442,6 +1447,7 @@ body.light-mode .badge-guest,
   background-color: var(--modal-overlay-bg);
   z-index: 998;
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   opacity: 0;
   transition: opacity var(--transition-normal) ease;
 }
@@ -1544,4 +1550,49 @@ body.light-mode .badge-guest,
 
 .table-occupation-card {
   word-break: break-word;
+  contain-intrinsic-size: 100px;
+  content-visibility: auto;
+}
+
+/* ==========================================
+   REGISTRATION TYPE BADGES (MANUAL vs ONLINE)
+   ========================================== */
+.badge-reg-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Online Registration Badge */
+.badge-online {
+  background-color: rgba(56, 189, 248, 0.15);
+  color: var(--info-color);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+body.light-mode .badge-online,
+[data-theme="light"] .badge-online {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border-color: #bae6fd !important;
+}
+
+/* Manual Registration Badge */
+.badge-manual {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warning-color);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+body.light-mode .badge-manual,
+[data-theme="light"] .badge-manual {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
 }

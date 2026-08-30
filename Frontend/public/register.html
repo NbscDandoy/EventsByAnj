@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Self-Registration</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h2 { color: #0066cc; margin-bottom: 20px; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { background-color: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        .message { margin-top: 15px; font-weight: bold; padding: 10px; border-radius: 6px; display: none; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Event Registration</h2>
+    <form id="regForm">
+        <input type="text" id="name" placeholder="Full Name" required>
+        <input type="text" id="nickname" placeholder="Nickname" required>
+        <button type="submit">Submit & Check-In</button>
+    </form>
+
+    <div id="msgBox" class="message"></div>
+</div>
+
+<script>
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('name').value;
+        const nickname = document.getElementById('nickname').value;
+        const msgBox = document.getElementById('msgBox');
+
+        msgBox.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, nickname })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                msgBox.className = 'message success';
+                msgBox.innerText = data.message;
+                msgBox.style.display = 'block';
+                document.getElementById('regForm').reset();
+            } else {
+                msgBox.className = 'message error';
+                msgBox.innerText = data.error || 'May problema sa pag-register.';
+                msgBox.style.display = 'block';
+            }
+        } catch (err) {
+            msgBox.className = 'message error';
+            msgBox.innerText = 'Network error. Pakisubukan ulit.';
+            msgBox.style.display = 'block';
+        }
+    });
+</script>
+
+</body>
+</html>
