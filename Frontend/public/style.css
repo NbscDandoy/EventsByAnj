@@ -855,7 +855,7 @@ body {
    ========================================== */
 .dashboard-occupation-section {
   background: var(--card-bg);
-  padding: 20px;
+  padding: 28px; /* Pinalaki mula 20px */
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   box-shadow: 0 2px 4px var(--shadow-color);
@@ -864,7 +864,7 @@ body {
 }
 
 .seating-title {
-  font-size: 1.25rem;
+  font-size: 1.75rem; /* Pinalaki mula 1.25rem */
   font-weight: 700;
   color: var(--heading-color);
 }
@@ -874,8 +874,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  gap: 1rem;
+  margin-bottom: 2rem; /* Pinalaki mula 1.5rem */
+  gap: 1.5rem;
   flex-wrap: wrap;
 }
 
@@ -883,25 +883,25 @@ body {
 .attendance-rate-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem; /* Pinalaki mula 1rem */
   background-color: var(--rate-card-bg);
-  padding: 0.6rem 1.25rem;
+  padding: 1rem 1.75rem; /* Pinalaki mula 0.6rem 1.25rem */
   border-radius: var(--radius-md);
   border: 1px solid var(--rate-card-border);
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
 }
 
 .rate-circle {
-  width: 44px;
-  height: 44px;
+  width: 64px; /* Pinalaki mula 44px */
+  height: 64px; /* Pinalaki mula 44px */
   border-radius: 50%;
-  border: 3px solid var(--rate-circle-border);
+  border: 4px solid var(--rate-circle-border); /* Pinalaki ang border thickness */
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   color: var(--rate-circle-text);
-  font-size: 0.85rem;
+  font-size: 1.15rem; /* Pinalaki mula 0.85rem */
   transition: border-color var(--transition-normal), color var(--transition-normal);
 }
 
@@ -911,7 +911,7 @@ body {
 }
 
 .rate-label {
-  font-size: 0.7rem;
+  font-size: 0.85rem; /* Pinalaki mula 0.7rem */
   color: var(--subtext-color);
   letter-spacing: 0.05em;
   font-weight: 600;
@@ -919,27 +919,28 @@ body {
 }
 
 .rate-counts {
-  font-size: 0.9rem;
+  font-size: 1.15rem; /* Pinalaki mula 0.9rem */
   color: var(--rate-details-count);
   transition: color var(--transition-normal);
 }
 
 .rate-counts strong {
+  font-size: 1.3rem; /* Ginawang mas litaw ang bilang */
   color: var(--success-color);
 }
 
 .main-occupation-grid,
 #standaloneOccupationGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); /* Pinalaki mula 220px */
+  gap: 20px; /* Pinalaki mula 16px */
 }
 
 .table-occupation-card {
   background-color: var(--recent-item-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  padding: 18px 20px; /* Pinalaki mula 14px 16px */
   cursor: pointer;
   user-select: none;
   transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
@@ -960,37 +961,37 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 1.1rem; /* Pinalaki mula 0.9rem */
   color: var(--text-color);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .table-count-badge {
-  font-size: 0.85rem;
+  font-size: 1.05rem; /* Pinalaki mula 0.85rem */
   font-weight: 600;
   color: var(--text-color);
 }
 
 .table-count-badge strong {
+  font-size: 1.15rem;
   color: var(--success-color);
   margin-left: 4px;
 }
 
 .table-progress-bar-bg {
   width: 100%;
-  height: 8px;
+  height: 12px; /* Pinalaki mula 8px */
   background-color: var(--border-color);
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .table-progress-bar-fill {
   height: 100%;
   background-color: var(--success-color);
-  border-radius: 4px;
+  border-radius: 6px;
   transition: width 0.3s ease;
 }
-
 /* ==========================================
    DATA TABLE
    ========================================== */
