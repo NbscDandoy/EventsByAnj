@@ -267,8 +267,20 @@ function setupDragAndDrop() {
 }
 
 async function processSelectedFiles(files) {
-    await uploadExcelFiles(files);
-    await fetchRecentFiles();
+    try {
+        showLoadingSpinner(true);
+
+        const uploadResult = await uploadExcelFiles(files);
+
+        await Promise.all([
+            fetchRecentFiles(),
+            renderUpdatedDashboard() 
+        ]);
+    } catch (error) {
+        console.error("Error processing files:", error);
+    } finally {
+        showLoadingSpinner(false);
+    }
 }
 
 function saveStateToLocalStorage() {
