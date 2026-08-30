@@ -101,12 +101,12 @@
                 document.getElementById('regForm').reset();
             } else {
                 msgBox.className = 'message error';
-                msgBox.innerText = data.error || 'May problema sa pag-register.';
+                msgBox.innerText = data.error || 'An error occurred.';
                 msgBox.style.display = 'block';
             }
         } catch (err) {
             msgBox.className = 'message error';
-            msgBox.innerText = 'Network error. Pakisubukan ulit.';
+            msgBox.innerText = 'Network error. Try again .';
             msgBox.style.display = 'block';
         }
     });

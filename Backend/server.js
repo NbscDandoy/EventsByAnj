@@ -297,8 +297,7 @@ async function processQrScanCheckIn(qrPayload) {
     const updatedGuest = { ...guest, status: 'Checked-In', check_in_time: checkInTimeStr };
     
     io.emit('guestUpdated', { id: guest.id, status: 'Checked-In', check_in_time: checkInTimeStr });
-    notifyTableOccupationChange();
-    notifyDashboardMetricsChange();
+    triggerRealtimeUpdates();
 
     return {
         success: true,
@@ -317,8 +316,7 @@ io.on('connection', (socket) => {
             const res = stmtUpdateStatus.run('Checked-In', checkInTimeStr, id);
             if (res.changes > 0) {
                 io.emit('guestUpdated', { id, status: 'Checked-In', check_in_time: checkInTimeStr });
-                notifyTableOccupationChange();
-                notifyDashboardMetricsChange();
+                triggerRealtimeUpdates();
             }
         } catch (err) {
             console.error('Socket checkIn error:', err.message);
@@ -330,8 +328,7 @@ io.on('connection', (socket) => {
             const res = stmtUpdateStatus.run('Not Checked-In', null, id);
             if (res.changes > 0) {
                 io.emit('guestUpdated', { id, status: 'Not Checked-In', check_in_time: null });
-                notifyTableOccupationChange();
-                notifyDashboardMetricsChange();
+                triggerRealtimeUpdates();
             }
         } catch (err) {
             console.error('Socket uncheckIn error:', err.message);
@@ -362,7 +359,7 @@ io.on('connection', (socket) => {
    REST API ENDPOINTS
    ========================================== */
 
-// 1. PUBLIC SELF-REGISTRATION ENDPOINT
+// 1. PUBLIC SELF-REGISTRATION ENDPOINT (SYNCED & INCLUDES TABLE NO.)
 app.post('/api/register', async (req, res) => {
     const { name, nickname, category, seat_plan } = req.body;
 
@@ -384,8 +381,9 @@ app.post('/api/register', async (req, res) => {
 
             return res.json({
                 success: true,
-                message: `Welcome, ${existingGuest.name}! Naka-check in ka na.`,
-                guest: existingGuest
+                message: `Thank you for registering, ${existingGuest.name}!`,
+                table_no: existingGuest.seat_plan || 'Unassigned',
+                guest: { ...existingGuest, status: 'Checked-In', check_in_time: checkInTimeStr }
             });
         }
 
@@ -395,14 +393,15 @@ app.post('/api/register', async (req, res) => {
         `).run(cleanName, nickname || '', guestCategory, guestSeat, checkInTimeStr);
 
         const newId = result.lastInsertRowid;
-        const personalQr = await generateQrCodeDataUrl({ id: newId, name: cleanName });
+        const personalQr = await generateQrCodeDataUrl({ id: newId, name: cleanName, table: guestSeat });
         stmtUpdateQrCode.run(personalQr, newId);
 
         triggerRealtimeUpdates();
 
         res.json({
             success: true,
-            message: `Salamat sa pag-register, ${cleanName}! Welcome sa Event.`,
+            message: `Thank you for registering, ${cleanName}! Welcome to the event.`,
+            table_no: guestSeat,
             id: newId
         });
 

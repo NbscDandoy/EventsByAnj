@@ -1246,7 +1246,7 @@ function escapeHtml(text) {
 }
 
 /* ==========================================
-   SOCKET LISTENERS
+   REAL-TIME SOCKET LISTENERS & HANDLERS
    ========================================== */
 socket.on('guestUpdated', ({ id, status, check_in_time }) => {
     const guestIndex = guests.findIndex(g => String(g.id) === String(id));
@@ -1263,13 +1263,30 @@ socket.on('guestUpdated', ({ id, status, check_in_time }) => {
     loadTableOccupation();
 });
 
+socket.on('tableOccupationUpdated', (data) => {
+    if (data && data.tables) {
+        globalOccupationData = data.tables;
+        renderTableOccupation(globalOccupationData);
+    } else {
+        loadTableOccupation();
+    }
+});
+
+socket.on('dashboardMetricsUpdated', (data) => {
+    if (data) {
+        const totalEl = document.getElementById('stat-total');
+        const checkedEl = document.getElementById('stat-checked');
+        const notCheckedEl = document.getElementById('stat-not-checked');
+
+        if (totalEl) totalEl.innerText = data.total_guests || 0;
+        if (checkedEl) checkedEl.innerText = data.checked_in || 0;
+        if (notCheckedEl) notCheckedEl.innerText = data.not_checked_in || 0;
+    }
+});
+
 socket.on('guestListReload', () => {
     loadGuests();
     fetchRecentFiles();
-});
-
-socket.on('tableOccupationUpdated', () => {
-    loadTableOccupation();
 });
 
 socket.on('error', (data) => {
