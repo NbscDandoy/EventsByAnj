@@ -758,7 +758,7 @@ body {
 }
 
 /* ==========================================
-   PULLING LIGHT SWITCH INTERACTION
+   PULLING LIGHT SWITCH INTERACTION (INAYOS)
    ========================================== */
 .pull-switch-wrapper {
   position: relative;
@@ -790,24 +790,18 @@ body {
 }
 
 .pull-handle {
-  width: 42px;
-  height: 28px;
-  background-color: var(--card-bg);
-  border: 2px solid var(--border-color);
+  width: 44px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px var(--shadow-color);
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color var(--transition-normal), border-color var(--transition-fast);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .pull-switch-label:hover .pull-string {
   background-color: var(--primary-color);
-}
-
-.pull-switch-label:hover .pull-handle {
-  border-color: var(--primary-color);
 }
 
 .pull-switch-label:active .pull-string {
@@ -819,47 +813,54 @@ body {
 }
 
 .theme-icon {
-  width: 14px;
-  height: 14px;
-  stroke-width: 2;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
   stroke: currentColor;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.icon-sun { 
-  color: #f59e0b; 
+
+/* ------------------------------------------
+   1. DEFAULT / DARK MODE STATE (UNCHECKED)
+   - Background ng switch: PUTI
+   - Icon: ARAW (SUN) na dark para kapans-pansin
+   ------------------------------------------ */
+.pull-switch-checkbox:not(:checked) + .pull-switch-label .pull-handle {
+  background-color: #ffffff;
+  border: 2px solid #ffffff;
+  color: #0f172a; /* Kulay ng Sun Icon */
 }
 
-.icon-moon { 
-  color: var(--text-color); 
+.pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-sun {
+  display: block;
 }
 
-/* ==========================================
-   INAYOS NA TOGGLE VISIBILITY LOGIC
-   ========================================== */
-
-/* KAPAG CHECKED (LIGHT MODE IS ACTIVE) */
-.pull-switch-checkbox:checked + .pull-switch-label .icon-sun { 
-  display: none; 
+.pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-moon {
+  display: none;
 }
 
-.pull-switch-checkbox:checked + .pull-switch-label .icon-moon { 
-  display: block; 
-  color: #0284c7;
+
+/* ------------------------------------------
+   2. LIGHT MODE STATE (CHECKED)
+   - Background ng switch: ITIM
+   - Icon: BUWAN (MOON) na PUTI
+   ------------------------------------------ */
+.pull-switch-checkbox:checked + .pull-switch-label .pull-handle {
+  background-color: #0f172a;
+  border: 2px solid #0f172a;
+  color: #ffffff; /* Kulay ng Moon Icon */
 }
 
-/* KAPAG UNCHECKED (DARK MODE IS ACTIVE) */
-.pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-sun { 
-  display: block; 
-  color: #f59e0b;
+.pull-switch-checkbox:checked + .pull-switch-label .icon-sun {
+  display: none;
 }
 
-.pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-moon { 
-  display: none; 
+.pull-switch-checkbox:checked + .pull-switch-label .icon-moon {
+  display: block;
 }
-
 /* ==========================================
    OCCUPATION GRIDS & CARDS
    ========================================== */
