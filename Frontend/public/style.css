@@ -1,4 +1,4 @@
-/* Import Fonts: Cinzel for Dark Mode Glow & Playfair Display for Light Mode Silk */
+/* Import Fonts: Cinzel for Dark & Light Mode Headers (Consistent Font) */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:wght@600;700;800&display=swap');
 
 /* ==========================================
@@ -56,7 +56,7 @@
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-serif-light: 'Playfair Display', Georgia, serif;
+  --font-serif-light: 'Cinzel', serif;
   --font-serif-dark: 'Cinzel', serif;
 }
 
@@ -129,28 +129,37 @@ body.light-mode .active-file-container {
 }
 
 /* ==========================================
-   HEADER & TITLE STYLING BY THEME
+   HEADER & TITLE STYLING BY THEME (UNIFIED FONT & ALIGNMENT)
    ========================================== */
 
-/* DARK MODE HEADERS (DEFAULT): Cinzel + Electric Gold Glow */
+/* BASE HEADER TYPOGRAPHY FOR PERFECT ALIGNMENT & PARITY */
 .header h1,
 .seating-title,
 .modal-header h2,
 .sidebar-header h2 {
-  font-family: var(--font-serif-dark);
-  letter-spacing: 0.04em;
+  font-family: 'Cinzel', serif !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  transition: color var(--transition-normal), background var(--transition-normal);
+}
+
+.sidebar-header h2 {
+  font-size: 1.25rem;
+}
+
+/* DARK MODE HEADERS (DEFAULT): Electric Gold Glow */
+.header h1,
+.seating-title,
+.modal-header h2,
+.sidebar-header h2 {
   background: linear-gradient(135deg, #ffffff 20%, #ffe259 70%, #ffa751 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
 }
 
-.sidebar-header h2 {
-  text-transform: uppercase;
-  font-size: 1.25rem;
-}
-
-/* LIGHT MODE HEADERS: Solid High-Contrast Dark Navy / Slate Accent */
+/* LIGHT MODE HEADERS: Solid High-Contrast Metallic Dark Slate Gradient */
 body.light-mode .header h1,
 body.light-mode .seating-title,
 body.light-mode .modal-header h2,
@@ -159,15 +168,11 @@ body.light-mode .sidebar-header h2,
 [data-theme="light"] .seating-title,
 [data-theme="light"] .modal-header h2,
 [data-theme="light"] .sidebar-header h2 {
-  font-family: var(--font-serif-light) !important;
-  letter-spacing: 0.01em !important;
-  color: #090d16 !important;
-  background: linear-gradient(135deg, #090d16 0%, #1e293b 70%, #854d0e 100%) !important;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 65%, #9a3412 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
-  filter: none !important;
-  font-weight: 800 !important;
+  filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.08)) !important;
 }
 
 /* Fallback for browsers that fail on webkit-text-fill-color */
@@ -176,7 +181,7 @@ body.light-mode .sidebar-header h2,
   body.light-mode .seating-title,
   body.light-mode .modal-header h2,
   body.light-mode .sidebar-header h2 {
-    color: #090d16 !important;
+    color: #0f172a !important;
   }
 }
 
@@ -504,7 +509,6 @@ body {
 
 .header h1 {
   font-size: 1.75rem;
-  font-weight: 700;
 }
 
 /* Active File Section */
@@ -981,7 +985,6 @@ body {
 
 .seating-title {
   font-size: 1.75rem;
-  font-weight: 700;
 }
 
 .seating-header-container {
@@ -1248,7 +1251,6 @@ body.light-mode .badge-guest {
 
 .modal-header h2 {
   font-size: 1.25rem;
-  font-weight: 700;
 }
 
 .modal-close {
