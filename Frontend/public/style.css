@@ -1,5 +1,5 @@
 /* Import Fonts: Cinzel for Dark Mode Glow & Playfair Display for Light Mode Silk */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:wght@600;700;800&display=swap');
 
 /* ==========================================
    CSS CUSTOM PROPERTIES / THEME VARIABLES
@@ -78,43 +78,43 @@ body.light-mode,
   --bg-color: transparent;
   --card-bg: rgba(255, 255, 255, 0.85);
   --sidebar-bg: rgba(255, 255, 255, 0.88);
-  --text-color: #2c3038;
-  --heading-color: #1a1a1a;
-  --subtext-color: #6d7582;
-  --border-color: rgba(212, 201, 186, 0.5);
-  --input-border: #d0c8be;
-  --input-bg: rgba(255, 255, 255, 0.92);
-  --table-header-bg: rgba(248, 246, 242, 0.9);
+  --text-color: #1e293b;
+  --heading-color: #0f172a;
+  --subtext-color: #475569;
+  --border-color: rgba(212, 201, 186, 0.6);
+  --input-border: #cbd5e1;
+  --input-bg: rgba(255, 255, 255, 0.95);
+  --table-header-bg: rgba(241, 245, 249, 0.95);
   --table-checked-bg: rgba(238, 246, 240, 0.85);
-  --table-hover-bg: rgba(245, 242, 236, 0.75);
-  --drop-zone-bg: rgba(252, 250, 246, 0.7);
-  --drop-zone-hover-bg: #f5f0e6;
+  --table-hover-bg: rgba(241, 245, 249, 0.8);
+  --drop-zone-bg: rgba(252, 250, 246, 0.8);
+  --drop-zone-hover-bg: #f1f5f9;
   --drop-zone-border: #b8975a;
   --drop-zone-hover-border: #8c6e33;
-  --shadow-color: rgba(45, 38, 25, 0.08);
-  --modal-overlay-bg: rgba(25, 20, 15, 0.5);
-  --recent-item-bg: rgba(246, 243, 237, 0.85);
-  --recent-item-hover: #e8e2d5;
+  --shadow-color: rgba(15, 23, 42, 0.08);
+  --modal-overlay-bg: rgba(15, 23, 42, 0.6);
+  --recent-item-bg: rgba(241, 245, 249, 0.9);
+  --recent-item-hover: #e2e8f0;
 
   /* Attendance Card Theme Variables - Light */
-  --rate-card-bg: rgba(246, 243, 237, 0.85);
+  --rate-card-bg: rgba(255, 255, 255, 0.9);
   --rate-card-border: rgba(212, 201, 186, 0.8);
   --rate-circle-border: #b8975a;
-  --rate-circle-text: #1a1a1a;
-  --rate-details-count: #333942;
+  --rate-circle-text: #0f172a;
+  --rate-details-count: #1e293b;
 
   /* Brand Colors - Light Mode Accent */
   --primary-color: #b8975a;
   --primary-hover: #96783d;
   --primary-focus-ring: rgba(184, 151, 90, 0.25);
-  --success-color: #2e7d32;
-  --success-hover: #1b5e20;
-  --danger-color: #c62828;
-  --danger-hover: #b71c1c;
-  --warning-color: #d87a00;
-  --warning-hover: #b26200;
-  --info-color: #0288d1;
-  --info-hover: #01579b;
+  --success-color: #166534;
+  --success-hover: #14532d;
+  --danger-color: #991b1b;
+  --danger-hover: #7f1d1d;
+  --warning-color: #c2410c;
+  --warning-hover: #9a3412;
+  --info-color: #0369a1;
+  --info-hover: #075985;
 }
 
 /* Glassmorphism Backdrop Blur for Light Mode Containers */
@@ -150,17 +150,34 @@ body.light-mode .active-file-container {
   font-size: 1.25rem;
 }
 
-/* LIGHT MODE HEADERS: Playfair Display + Deep Silk Gold Gradient */
+/* LIGHT MODE HEADERS: Solid High-Contrast Dark Navy / Slate Accent */
 body.light-mode .header h1,
 body.light-mode .seating-title,
 body.light-mode .modal-header h2,
-body.light-mode .sidebar-header h2 {
-  font-family: var(--font-serif-light);
-  letter-spacing: 0.02em;
-  background: linear-gradient(135deg, #1a1a1a 0%, #63502d 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: none;
+body.light-mode .sidebar-header h2,
+[data-theme="light"] .header h1,
+[data-theme="light"] .seating-title,
+[data-theme="light"] .modal-header h2,
+[data-theme="light"] .sidebar-header h2 {
+  font-family: var(--font-serif-light) !important;
+  letter-spacing: 0.01em !important;
+  color: #090d16 !important;
+  background: linear-gradient(135deg, #090d16 0%, #1e293b 70%, #854d0e 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  filter: none !important;
+  font-weight: 800 !important;
+}
+
+/* Fallback for browsers that fail on webkit-text-fill-color */
+@supports not (-webkit-background-clip: text) {
+  body.light-mode .header h1,
+  body.light-mode .seating-title,
+  body.light-mode .modal-header h2,
+  body.light-mode .sidebar-header h2 {
+    color: #090d16 !important;
+  }
 }
 
 /* ==========================================
@@ -835,7 +852,7 @@ body {
 .btn-undo {
   background-color: var(--warning-color);
   color: #ffffff;
-  padding: 6px 12px;
+  padding: 6px 10px;
   font-size: 0.8rem;
   border-radius: var(--radius-sm);
   border: none;
@@ -1167,8 +1184,8 @@ body.light-mode .badge-vip {
 }
 
 body.light-mode .badge-guest {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: #e2e8f0;
+  color: #1e293b;
 }
 
 .status-checked {
