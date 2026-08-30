@@ -370,14 +370,30 @@ async function removeRecentFile(e, fileName) {
     } catch (err) {
         console.error('Error syncing file removal with backend server:', err);
     } finally {
+        // Alisin sa array ng loadedFiles
         loadedFiles = loadedFiles.filter(f => f !== fileName);
+        
+        // SURIN KUNG ANG BINURANG FILE AY ANG KASALUKUYANG ACTIVE FILE
         if (currentActiveFile === fileName) {
-            currentActiveFile = loadedFiles.length > 0 ? loadedFiles[loadedFiles.length - 1] : '';
-        }
-        saveStateToLocalStorage();
+            // Piliin ang pinakahuling natirang file (kung mayroon)
+            const remainingFile = loadedFiles.length > 0 ? loadedFiles[loadedFiles.length - 1] : '';
+            currentActiveFile = remainingFile;
 
-        await fetchRecentFiles();
-        await loadGuests();
+            // KUNG MAY NATIRANG FILE,I-LOAD AT I-SYNC ITO SA BACKEND AGAD
+            if (remainingFile) {
+                await selectAndLoadFile(remainingFile);
+            } else {
+                // KUNG WALA NANG NATIRANG FILE, LINISIN ANG STATE
+                saveStateToLocalStorage();
+                await fetchRecentFiles();
+                await loadGuests();
+            }
+        } else {
+            // Kung hindi naman active file ang binura, simpleng refresh lang ng state
+            saveStateToLocalStorage();
+            await fetchRecentFiles();
+            await loadGuests();
+        }
     }
 }
 
