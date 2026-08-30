@@ -1,62 +1,9 @@
 /* ==========================================
    CSS CUSTOM PROPERTIES / THEME VARIABLES
    ========================================== */
+
+/* DEFAULT THEME: DARK MODE */
 :root {
-  /* Colors - Light Theme */
-  --bg-color: #f8fafc;
-  --card-bg: #ffffff;
-  --sidebar-bg: #ffffff;
-  --text-color: #1e293b;
-  --heading-color: #0f172a;
-  --subtext-color: #64748b;
-  --border-color: #e2e8f0;
-  --input-border: #cbd5e1;
-  --input-bg: #ffffff;
-  --table-header-bg: #f8fafc;
-  --table-checked-bg: #f0fdf4;
-  --table-hover-bg: #f1f5f9;
-  --drop-zone-bg: #f8fafc;
-  --drop-zone-hover-bg: #eff6ff;
-  --drop-zone-border: #3b82f6;
-  --drop-zone-hover-border: #1d4ed8;
-  --shadow-color: rgba(15, 23, 42, 0.08);
-  --modal-overlay-bg: rgba(15, 23, 42, 0.5);
-  --recent-item-bg: #f1f5f9;
-  --recent-item-hover: #e2e8f0;
-
-  /* Attendance Card Theme Variables - Light */
-  --rate-card-bg: #f1f5f9;
-  --rate-card-border: #cbd5e1;
-  --rate-circle-border: #2563eb;
-  --rate-circle-text: #0f172a;
-  --rate-details-count: #334155;
-
-  /* Brand & Status Colors */
-  --primary-color: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-focus-ring: rgba(37, 99, 235, 0.25);
-  --success-color: #16a34a;
-  --success-hover: #15803d;
-  --danger-color: #dc2626;
-  --danger-hover: #b91c1c;
-  --warning-color: #d97706;
-  --warning-hover: #b45309;
-  --info-color: #0891b2;
-  --info-hover: #0e7490;
-
-  /* Geometry & Motion */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
-  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-[data-theme="dark"],
-body.dark-theme {
-  /* Colors - Dark Theme */
   --bg-color: #0f172a;
   --card-bg: #1e293b;
   --sidebar-bg: #182232;
@@ -91,6 +38,66 @@ body.dark-theme {
   --primary-focus-ring: rgba(59, 130, 246, 0.35);
   --success-color: #22c55e;
   --success-hover: #4ade80;
+  --danger-color: #ef4444;
+  --danger-hover: #f87171;
+  --warning-color: #f59e0b;
+  --warning-hover: #fbbf24;
+  --info-color: #06b6d4;
+  --info-hover: #22d3ee;
+
+  /* Geometry & Motion */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* OVERRIDE THEME: LIGHT MODE (INAYOS ANG SELECTOR MATCH) */
+body.light-mode,
+[data-theme="light"] {
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --sidebar-bg: #ffffff;
+  --text-color: #1e293b;
+  --heading-color: #0f172a;
+  --subtext-color: #64748b;
+  --border-color: #e2e8f0;
+  --input-border: #cbd5e1;
+  --input-bg: #ffffff;
+  --table-header-bg: #f8fafc;
+  --table-checked-bg: #f0fdf4;
+  --table-hover-bg: #f1f5f9;
+  --drop-zone-bg: #f8fafc;
+  --drop-zone-hover-bg: #eff6ff;
+  --drop-zone-border: #3b82f6;
+  --drop-zone-hover-border: #1d4ed8;
+  --shadow-color: rgba(15, 23, 42, 0.08);
+  --modal-overlay-bg: rgba(15, 23, 42, 0.5);
+  --recent-item-bg: #f1f5f9;
+  --recent-item-hover: #e2e8f0;
+
+  /* Attendance Card Theme Variables - Light */
+  --rate-card-bg: #f1f5f9;
+  --rate-card-border: #cbd5e1;
+  --rate-circle-border: #2563eb;
+  --rate-circle-text: #0f172a;
+  --rate-details-count: #334155;
+
+  /* Brand Colors - Light Mode */
+  --primary-color: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-focus-ring: rgba(37, 99, 235, 0.25);
+  --success-color: #16a34a;
+  --success-hover: #15803d;
+  --danger-color: #dc2626;
+  --danger-hover: #b91c1c;
+  --warning-color: #d97706;
+  --warning-hover: #b45309;
+  --info-color: #0891b2;
+  --info-hover: #0e7490;
 }
 
 /* ==========================================
@@ -751,7 +758,7 @@ body {
 }
 
 /* ==========================================
-PULLING LIGHT SWITCH INTERACTION
+   PULLING LIGHT SWITCH INTERACTION
    ========================================== */
 .pull-switch-wrapper {
   position: relative;
@@ -830,32 +837,35 @@ PULLING LIGHT SWITCH INTERACTION
 }
 
 /* ==========================================
-   TOGGLE VISIBILITY LOGIC
+   INAYOS NA TOGGLE VISIBILITY LOGIC
    ========================================== */
 
-/* KAPAG NAKA-CHECK (LIGHT MODE) */
+/* KAPAG CHECKED (LIGHT MODE IS ACTIVE) */
 .pull-switch-checkbox:checked + .pull-switch-label .icon-sun { 
-  display: block; 
+  display: none; 
 }
 
 .pull-switch-checkbox:checked + .pull-switch-label .icon-moon { 
-  display: none; 
+  display: block; 
+  color: #0284c7;
 }
 
-/* KAPAG HINDI NAKA-CHECK (DARK MODE) */
+/* KAPAG UNCHECKED (DARK MODE IS ACTIVE) */
 .pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-sun { 
-  display: none; 
+  display: block; 
+  color: #f59e0b;
 }
 
 .pull-switch-checkbox:not(:checked) + .pull-switch-label .icon-moon { 
-  display: block; 
+  display: none; 
 }
+
 /* ==========================================
    OCCUPATION GRIDS & CARDS
    ========================================== */
 .dashboard-occupation-section {
   background: var(--card-bg);
-  padding: 28px; /* Pinalaki mula 20px */
+  padding: 28px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   box-shadow: 0 2px 4px var(--shadow-color);
@@ -864,7 +874,7 @@ PULLING LIGHT SWITCH INTERACTION
 }
 
 .seating-title {
-  font-size: 1.75rem; /* Pinalaki mula 1.25rem */
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--heading-color);
 }
@@ -874,7 +884,7 @@ PULLING LIGHT SWITCH INTERACTION
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem; /* Pinalaki mula 1.5rem */
+  margin-bottom: 2rem;
   gap: 1.5rem;
   flex-wrap: wrap;
 }
@@ -883,25 +893,25 @@ PULLING LIGHT SWITCH INTERACTION
 .attendance-rate-card {
   display: flex;
   align-items: center;
-  gap: 1.25rem; /* Pinalaki mula 1rem */
+  gap: 1.25rem;
   background-color: var(--rate-card-bg);
-  padding: 1rem 1.75rem; /* Pinalaki mula 0.6rem 1.25rem */
+  padding: 1rem 1.75rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--rate-card-border);
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
 }
 
 .rate-circle {
-  width: 64px; /* Pinalaki mula 44px */
-  height: 64px; /* Pinalaki mula 44px */
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  border: 4px solid var(--rate-circle-border); /* Pinalaki ang border thickness */
+  border: 4px solid var(--rate-circle-border);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   color: var(--rate-circle-text);
-  font-size: 1.15rem; /* Pinalaki mula 0.85rem */
+  font-size: 1.15rem;
   transition: border-color var(--transition-normal), color var(--transition-normal);
 }
 
@@ -911,7 +921,7 @@ PULLING LIGHT SWITCH INTERACTION
 }
 
 .rate-label {
-  font-size: 0.85rem; /* Pinalaki mula 0.7rem */
+  font-size: 0.85rem;
   color: var(--subtext-color);
   letter-spacing: 0.05em;
   font-weight: 600;
@@ -919,28 +929,28 @@ PULLING LIGHT SWITCH INTERACTION
 }
 
 .rate-counts {
-  font-size: 1.15rem; /* Pinalaki mula 0.9rem */
+  font-size: 1.15rem;
   color: var(--rate-details-count);
   transition: color var(--transition-normal);
 }
 
 .rate-counts strong {
-  font-size: 1.3rem; /* Ginawang mas litaw ang bilang */
+  font-size: 1.3rem;
   color: var(--success-color);
 }
 
 .main-occupation-grid,
 #standaloneOccupationGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); /* Pinalaki mula 220px */
-  gap: 20px; /* Pinalaki mula 16px */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
 }
 
 .table-occupation-card {
   background-color: var(--recent-item-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 18px 20px; /* Pinalaki mula 14px 16px */
+  padding: 18px 20px;
   cursor: pointer;
   user-select: none;
   transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
@@ -961,13 +971,13 @@ PULLING LIGHT SWITCH INTERACTION
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 1.1rem; /* Pinalaki mula 0.9rem */
+  font-size: 1.1rem;
   color: var(--text-color);
   margin-bottom: 12px;
 }
 
 .table-count-badge {
-  font-size: 1.05rem; /* Pinalaki mula 0.85rem */
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-color);
 }
@@ -980,7 +990,7 @@ PULLING LIGHT SWITCH INTERACTION
 
 .table-progress-bar-bg {
   width: 100%;
-  height: 12px; /* Pinalaki mula 8px */
+  height: 12px;
   background-color: var(--border-color);
   border-radius: 6px;
   overflow: hidden;
@@ -992,6 +1002,7 @@ PULLING LIGHT SWITCH INTERACTION
   border-radius: 6px;
   transition: width 0.3s ease;
 }
+
 /* ==========================================
    DATA TABLE
    ========================================== */
@@ -1057,8 +1068,8 @@ PULLING LIGHT SWITCH INTERACTION
   color: #92400e;
 }
 
-[data-theme="dark"] .badge-vip,
-body.dark-theme .badge-vip {
+body.dark-mode .badge-vip,
+[data-theme="dark"] .badge-vip {
   background-color: #78350f;
   color: #fde68a;
 }
@@ -1068,8 +1079,8 @@ body.dark-theme .badge-vip {
   color: #374151;
 }
 
-[data-theme="dark"] .badge-guest,
-body.dark-theme .badge-guest {
+body.dark-mode .badge-guest,
+[data-theme="dark"] .badge-guest {
   background-color: #374151;
   color: #f3f4f6;
 }
