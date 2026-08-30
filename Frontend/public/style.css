@@ -751,7 +751,7 @@ body {
 }
 
 /* ==========================================
-   PULLING LIGHT SWITCH INTERACTION
+PULLING LIGHT SWITCH INTERACTION
    ========================================== */
 .pull-switch-wrapper {
   position: relative;
@@ -778,7 +778,7 @@ body {
   width: 2px;
   height: 32px;
   background-color: var(--subtext-color);
-  transition: height 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color var(--transition-fast);
   border-radius: 1px;
 }
 
@@ -830,7 +830,7 @@ body {
 }
 
 /* ==========================================
-   CORRECTED TOGGLE LOGIC (NO BODY CONFLICTS)
+   TOGGLE VISIBILITY LOGIC
    ========================================== */
 
 /* KAPAG NAKA-CHECK (LIGHT MODE) */

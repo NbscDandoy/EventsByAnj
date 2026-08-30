@@ -157,35 +157,48 @@ function switchTab(tab) {
     const sidebarQrSection = document.getElementById('sidebarQrSection');
 
     if (tab === 'dashboard') {
+        // Ipakita ang Main Dashboard, itago ang Seating Overview
         if (mainDashboardView) mainDashboardView.classList.remove('hidden');
         if (mainTablesView) mainTablesView.classList.add('hidden');
+        
+        // Update Active States
         if (btnNavDashboard) btnNavDashboard.classList.add('active');
         if (btnNavTables) btnNavTables.classList.remove('active');
         if (mainTitle) mainTitle.textContent = 'Dashboard';
 
-        // Itatago ang Sidebar QR code kapag nasa Dashboard view
+        // Itatago ang Sidebar QR code sa Dashboard view
         if (sidebarQrSection) sidebarQrSection.classList.add('hidden');
+
     } else if (tab === 'tables') {
+        // Itago ang Main Dashboard, ipakita ang Seating Overview
         if (mainDashboardView) mainDashboardView.classList.add('hidden');
         if (mainTablesView) mainTablesView.classList.remove('hidden');
+        
+        // Update Active States
         if (btnNavDashboard) btnNavDashboard.classList.remove('active');
         if (btnNavTables) btnNavTables.classList.add('active');
         if (mainTitle) mainTitle.textContent = 'Seating Capacity Overview';
-        
-        // Kung nasa URL hash `#seating` (view mode ng bisita/mag-i-iscan), itago rin ang QR code sa sidebar
+
+        // Tignan kung bisita/guest view mode (#seating hash)
+        const isGuestView = window.location.hash === '#seating';
+
         if (sidebarQrSection) {
-            if (window.location.hash === '#seating') {
+            if (isGuestView) {
                 sidebarQrSection.classList.add('hidden');
             } else {
                 sidebarQrSection.classList.remove('hidden');
             }
         }
-        
+
+        // I-fetch ang seating data
         loadTableOccupation();
-        generateSeatingQRCode();
+
+        // I-generate lang ang QR code kung HINDI guest view mode
+        if (!isGuestView && typeof generateSeatingQRCode === 'function') {
+            generateSeatingQRCode();
+        }
     }
 }
-
 /* ==========================================
    SIDEBAR, ACTIVE BANNER & FILE STATE
    ========================================== */
@@ -693,44 +706,22 @@ function sortTablesList(tables) {
 }
 
 function renderTableOccupation(tables) {
-    const mainGridContainer = document.getElementById('mainOccupationGrid');
     const standaloneContainer = document.getElementById('standaloneOccupationGrid');
+    const mainGridContainer = document.getElementById('mainOccupationGrid');
 
+    // Handle Empty State
     if (!tables || tables.length === 0) {
         const emptyHTML = `<p class="empty-state">No table assignments found.</p>`;
-        if (mainGridContainer) mainGridContainer.innerHTML = emptyHTML;
         if (standaloneContainer) standaloneContainer.innerHTML = emptyHTML;
+        if (mainGridContainer) mainGridContainer.innerHTML = emptyHTML;
         return;
     }
 
     // Pagsunod-sunorin ang mga mesa: VIP 1-4 -> Regular Tables 1-N -> Unassigned
     const sortedTables = sortTablesList(tables);
 
-    const dashboardCardsHTML = sortedTables.map(tbl => {
-        const tableName = tbl.table_name || 'Unassigned';
-        const total = tbl.total_guests || 0;
-        const checked = tbl.checked_in_count || 0;
-        const percentage = total > 0 ? Math.round((checked / total) * 100) : 0;
-        const isFull = total > 0 && checked === total;
-
-        return `
-            <div class="table-card-item table-occupation-card ${isFull ? 'table-full' : ''}" 
-                 data-table-name="${escapeHtml(tableName)}" 
-                 title="Click to filter guest list">
-                <div class="table-occupation-header">
-                    <strong>${escapeHtml(tableName)}</strong>
-                    <span class="table-count-badge">
-                        ${checked} / ${total}
-                    </span>
-                </div>
-                <div class="table-progress-bar-bg">
-                    <div class="table-progress-bar-fill" style="width: ${percentage}%;"></div>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    const seatingOverviewCardsHTML = sortedTables.map(tbl => {
+    // Isang beses lang i-generate ang HTML cards para sa dalawang containers
+    const cardsHTML = sortedTables.map(tbl => {
         const tableName = tbl.table_name || 'Unassigned';
         const total = tbl.total_guests || 0;
         const checked = tbl.checked_in_count || 0;
@@ -754,8 +745,9 @@ function renderTableOccupation(tables) {
         `;
     }).join('');
 
-    if (mainGridContainer) mainGridContainer.innerHTML = dashboardCardsHTML;
-    if (standaloneContainer) standaloneContainer.innerHTML = seatingOverviewCardsHTML;
+    // Safe DOM injection
+    if (standaloneContainer) standaloneContainer.innerHTML = cardsHTML;
+    if (mainGridContainer) mainGridContainer.innerHTML = cardsHTML;
 }
 
 /* ==========================================
