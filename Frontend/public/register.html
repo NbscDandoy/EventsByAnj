@@ -73,16 +73,11 @@
             cursor: not-allowed;
         }
         .message { 
-            margin-top: 20px; 
+            margin-top: 10px; 
             padding: 15px; 
             border-radius: 12px; 
             display: none; 
             text-align: center;
-        }
-        .success { 
-            background-color: #064e3b; 
-            color: #ecfdf5; 
-            border: 1px solid #059669;
         }
         .error { 
             background-color: #7f1d1d; 
@@ -90,10 +85,17 @@
             border: 1px solid #dc2626;
         }
         
-        /* MALAKING TABLE NUMBER CARD */
+        /* MALAKING TABLE NUMBER CARD (IPAPALIT SA FORM) */
+        .confirmation-card {
+            background-color: #064e3b; 
+            color: #ecfdf5; 
+            border: 1px solid #059669;
+            padding: 20px;
+            border-radius: 12px;
+        }
         .table-card {
             margin-top: 15px;
-            padding: 20px 15px;
+            padding: 25px 15px;
             background: #0f172a;
             border-radius: 12px;
             border: 2px solid #22c55e;
@@ -104,16 +106,22 @@
             text-transform: uppercase;
             letter-spacing: 1.5px;
             color: #94a3b8;
-            margin: 0 0 6px 0;
+            margin: 0 0 8px 0;
             font-weight: 600;
         }
         .table-display {
-            font-size: 42px; /* MALAKING TABLE NUMBER */
+            font-size: 56px; /* PINAMALAKING TABLE NUMBER */
             font-weight: 900;
             color: #38bdf8;
             margin: 0;
-            line-height: 1.1;
+            line-height: 1;
             word-break: break-word;
+        }
+        .already-checked {
+            font-size: 13px;
+            color: #a7f3d0;
+            margin-top: 10px;
+            font-style: italic;
         }
     </style>
 </head>
@@ -121,23 +129,65 @@
 
 <div class="card">
     <h2>Event Registration</h2>
+    
+    <!-- REGISTRATION FORM -->
     <form id="regForm" autocomplete="off">
         <input type="text" id="name" placeholder="Full Name" required />
         <input type="text" id="nickname" placeholder="Nickname (Optional)" />
         <button type="submit" id="btnSubmit">Submit & Check-In</button>
     </form>
 
-    <div id="msgBox" class="message" aria-live="polite"></div>
+    <!-- CONTAINER PARA SA TABLE NUMBER / CHECK-IN RESULT -->
+    <div id="resultContainer" style="display: none;"></div>
+    
+    <!-- ERROR MESSAGE BOX -->
+    <div id="errorMsgBox" class="message error" aria-live="polite"></div>
 </div>
 
 <script>
-    document.getElementById('regForm').addEventListener('submit', async (e) => {
+    const regForm = document.getElementById('regForm');
+    const resultContainer = document.getElementById('resultContainer');
+    const errorMsgBox = document.getElementById('errorMsgBox');
+
+    // Function para ipakita ang Table Number at itago ang form
+    function showTableCard(guestName, tableNo, isAlreadyChecked = false) {
+        regForm.style.display = 'none';
+        errorMsgBox.style.display = 'none';
+
+        resultContainer.innerHTML = `
+            <div class="confirmation-card">
+                <div style="font-size: 18px; font-weight: bold;">
+                    Thank you for registering, ${guestName}!
+                </div>
+                <div class="table-card">
+                    <p class="table-title">YOUR TABLE / SEAT NUMBER</p>
+                    <p class="table-display">${tableNo || 'Unassigned'}</p>
+                </div>
+                ${isAlreadyChecked ? '<p class="already-checked">You are already checked in.</p>' : ''}
+            </div>
+        `;
+        resultContainer.style.display = 'block';
+    }
+
+    // Pag-check kung nakapag-register na ang browser/device na ito dati
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedRegistration = localStorage.getItem('event_checkin_data');
+        if (savedRegistration) {
+            try {
+                const data = JSON.parse(savedRegistration);
+                showTableCard(data.name, data.table_no, true);
+            } catch (e) {
+                localStorage.removeItem('event_checkin_data');
+            }
+        }
+    });
+
+    regForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const nameInput = document.getElementById('name');
         const nicknameInput = document.getElementById('nickname');
         const btnSubmit = document.getElementById('btnSubmit');
-        const msgBox = document.getElementById('msgBox');
 
         const name = nameInput.value.trim();
         const nickname = nicknameInput.value.trim();
@@ -146,7 +196,7 @@
 
         btnSubmit.disabled = true;
         btnSubmit.innerText = 'Processing...';
-        msgBox.style.display = 'none';
+        errorMsgBox.style.display = 'none';
 
         try {
             const res = await fetch('/api/register', {
@@ -158,31 +208,25 @@
             const data = await res.json();
 
             if (data.success) {
-                msgBox.className = 'message success';
+                const tableNo = data.table_no || 'Unassigned';
                 
-                // Ginagamit ang innerHTML para ma-render ang MALAKING Table Number
-                msgBox.innerHTML = `
-                    <div style="font-size: 16px; font-weight: bold;">
-                        ${data.message}
-                    </div>
-                    <div class="table-card">
-                        <p class="table-title">YOUR TABLE / SEAT NUMBER</p>
-                        <p class="table-display">${data.table_no || 'Unassigned'}</p>
-                    </div>
-                `;
-                
-                msgBox.style.display = 'block';
-                document.getElementById('regForm').reset();
+                // I-save sa LocalStorage para kahit i-refresh ay nakatago pa rin ang form
+                localStorage.setItem('event_checkin_data', JSON.stringify({
+                    name: data.guest?.name || name,
+                    table_no: tableNo
+                }));
+
+                // Itago ang form at ipakita ang table card
+                showTableCard(data.guest?.name || name, tableNo);
             } else {
-                msgBox.className = 'message error';
-                msgBox.innerText = data.error || 'An error occurred during registration.';
-                msgBox.style.display = 'block';
+                errorMsgBox.innerText = data.error || 'An error occurred during registration.';
+                errorMsgBox.style.display = 'block';
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = 'Submit & Check-In';
             }
         } catch (err) {
-            msgBox.className = 'message error';
-            msgBox.innerText = 'Network error. Please try again.';
-            msgBox.style.display = 'block';
-        } finally {
+            errorMsgBox.innerText = 'Network error. Please try again.';
+            errorMsgBox.style.display = 'block';
             btnSubmit.disabled = false;
             btnSubmit.innerText = 'Submit & Check-In';
         }
