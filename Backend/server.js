@@ -205,13 +205,12 @@ function clearGuestsTable() {
     }
 }
 
-// Optimized Parallel Bulk Insertion
+// Optimized Bulk Insertion with Parallel QR Generation
 async function bulkInsertGuests(guests) {
     if (!guests || guests.length === 0) return;
 
     const insertedRecords = [];
 
-    // Step 1: Fast Transaction Insertion
     const runTransaction = db.transaction((list) => {
         for (const g of list) {
             const res = stmtInsertGuest.run(g.name, g.nickname, g.category, g.seat_plan, null);
@@ -221,7 +220,7 @@ async function bulkInsertGuests(guests) {
 
     runTransaction(guests);
 
-    // Step 2: Parallel QR Code Generation
+    // Parallel QR Code Generation for performance
     await Promise.all(
         insertedRecords.map(async (record) => {
             const qrDataUrl = await generateQrCodeDataUrl({ id: record.id, name: record.name, table: record.table });
@@ -363,7 +362,7 @@ io.on('connection', (socket) => {
    REST API ENDPOINTS
    ========================================== */
 
-// 1. PUBLIC SELF-REGISTRATION ENDPOINT (Para sa Master QR Code)
+// 1. PUBLIC SELF-REGISTRATION ENDPOINT
 app.post('/api/register', async (req, res) => {
     const { name, nickname, category, seat_plan } = req.body;
 
@@ -377,11 +376,9 @@ app.post('/api/register', async (req, res) => {
     const checkInTimeStr = getPhilippineTime();
 
     try {
-        // Tignan kung nakatala na ang guest
         const existingGuest = stmtSelectGuestByName.get(cleanName);
 
         if (existingGuest) {
-            // Kung nariyan na, i-update lang ang status nito sa Checked-In
             stmtUpdateStatus.run('Checked-In', checkInTimeStr, existingGuest.id);
             triggerRealtimeUpdates();
 
@@ -392,7 +389,6 @@ app.post('/api/register', async (req, res) => {
             });
         }
 
-        // Kung bagong guest, i-save at i-check in
         const result = db.prepare(`
             INSERT INTO guests (name, nickname, category, seat_plan, status, check_in_time)
             VALUES (?, ?, ?, ?, 'Checked-In', ?)
@@ -416,7 +412,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// 2. MASTER EVENT QR CODE GENERATOR (Iisang QR Code para sa Lahat)
+// 2. MASTER EVENT QR CODE GENERATOR
 app.get('/api/event-qrcode', async (req, res) => {
     try {
         const hostUrl = `${req.protocol}://${req.get('host')}/register.html`;

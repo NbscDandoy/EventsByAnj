@@ -136,7 +136,6 @@ async function generateEventQrStandee() {
     }
 
     try {
-        // Direct fetch sa backend master QR endpoint (/api/event-qrcode)
         const res = await fetch('/api/event-qrcode');
         const data = await res.json();
 
@@ -219,11 +218,9 @@ function switchTab(tab) {
     const mainTitle = document.getElementById('mainTitle');
     const sidebarQrSection = document.getElementById('sidebarQrSection');
 
-    // Itago lahat ng views at linisin ang active buttons
     Object.values(views).forEach(v => v && v.classList.add('hidden'));
     Object.values(navBtns).forEach(b => b && b.classList.remove('active'));
 
-    // Ipakita ang napiling view
     if (views[tab]) views[tab].classList.remove('hidden');
     if (navBtns[tab]) navBtns[tab].classList.add('active');
 
@@ -272,7 +269,7 @@ function setupSelfCheckInLogic() {
             const matches = guests.filter(g => 
                 (g.name && g.name.toLowerCase().includes(query)) ||
                 (g.nickname && g.nickname.toLowerCase().includes(query))
-            ).slice(0, 5); // Limit to top 5 results
+            ).slice(0, 5);
 
             if (matches.length === 0) {
                 resultList.innerHTML = `<li class="no-result">No matching guest found</li>`;
@@ -1257,7 +1254,6 @@ socket.on('guestUpdated', ({ id, status, check_in_time }) => {
         guests[guestIndex].status = status;
         guests[guestIndex].check_in_time = check_in_time;
         
-        // Dynamic re-render kapag si self-check-in user ang na-update
         if (selectedSelfCheckInGuest && String(selectedSelfCheckInGuest.id) === String(id)) {
             selectedSelfCheckInGuest.status = status;
             displaySelfCheckInResult(selectedSelfCheckInGuest);
